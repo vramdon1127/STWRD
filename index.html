@@ -1701,7 +1701,7 @@ async function renderStats() {
       advice: { low: "Faith hasn't shown up in your tasks this week", high: "Faith is present in your week" }
     },
     {
-      name: 'Finance', icon: '💰', color: '#fbbf24',
+      name: 'Personal Finance', icon: '💰', color: '#fbbf24',
       keywords: ['invoice', 'payment', 'bill', 'budget', 'tax', 'money', 'zelle', 'deposit', 'proconnect', 'plaid'],
       goal: 2, unit: 'tasks/week',
       advice: { low: 'Financial tasks getting delayed — cash flow at risk', high: 'Staying on top of finances' }
@@ -2365,7 +2365,7 @@ async function saveWeeklySnapshot() {
       { name: 'Family', keywords: ['mia','baby','home','house','birthday','gift','party','nursery','paint','mattress','depot','crue','jada'], goal: 2 },
       { name: 'Health', keywords: ['workout','gym','exercise','run','walk','doctor','sleep','eat','diet','health','mental','meditat'], goal: 3 },
       { name: 'Faith', keywords: ['church','pray','devotion','bible','worship','faith','sermon','ministry','god','spiritual'], goal: 1 },
-      { name: 'Finance', keywords: ['invoice','payment','bill','budget','tax','money','zelle','deposit','proconnect','plaid'], goal: 2 },
+      { name: 'Personal Finance', keywords: ['budget','debt','savings','mortgage','rent','groceries','bills','credit card','paycheck','emergency fund','insurance','loan'], goal: 2 },
       { name: 'Growth', keywords: ['learn','read','course','study','book','research','build','app','skill','improve','practice'], goal: 1 },
       { name: 'Recharge', keywords: ['game','video','play','rest','relax','netflix','movie','tv','break','vacation'], goal: 1 },
     ];
@@ -2501,7 +2501,7 @@ async function renderProgress() {
     { key: 'life_family', name: 'Family', color: '#34d399', icon: '🏠' },
     { key: 'life_health', name: 'Health', color: '#fb923c', icon: '💪' },
     { key: 'life_faith', name: 'Faith', color: '#a78bfa', icon: '🙏' },
-    { key: 'life_finance', name: 'Finance', color: '#fbbf24', icon: '💰' },
+    { key: 'life_finance', name: 'Personal Finance', color: '#fbbf24', icon: '💰' },
     { key: 'life_growth', name: 'Growth', color: '#38bdf8', icon: '🌱' },
     { key: 'life_recharge', name: 'Recharge', color: '#6b7280', icon: '🎮' },
   ];
@@ -2625,7 +2625,7 @@ const OB_DEFAULT_METRICS = [
   { name: 'Family', icon: '🏠', color: '#34d399', goal: 2, keywords: ['family','home','kids','spouse','partner','baby'], active: true },
   { name: 'Health', icon: '💪', color: '#fb923c', goal: 3, keywords: ['workout','gym','exercise','run','walk','doctor','health'], active: true },
   { name: 'Faith', icon: '🙏', color: '#a78bfa', goal: 1, keywords: ['church','pray','devotion','bible','worship','faith','spiritual'], active: true },
-  { name: 'Finance', icon: '💰', color: '#fbbf24', goal: 2, keywords: ['invoice','payment','bill','budget','tax','money'], active: true },
+  { name: 'Personal Finance', icon: '💰', color: '#fbbf24', goal: 2, keywords: ['invoice','payment','bill','budget','tax','money'], active: true },
   { name: 'Growth', icon: '🌱', color: '#38bdf8', goal: 1, keywords: ['learn','read','course','study','research','build','skill'], active: true },
   { name: 'Recharge', icon: '🎮', color: '#6b7280', goal: 1, keywords: ['rest','relax','movie','game','vacation','break'], active: false },
 ];
@@ -2712,7 +2712,7 @@ function renderObMetrics() {
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Keywords that signal ${m.name} in your tasks <span style="opacity:0.6;">(optional)</span></div>
           <input type="text" 
-            placeholder="e.g. ${m.name === 'Faith' ? 'church, prayer, pastor, devotion, Bible' : m.name === 'Health' ? 'gym, workout, run, doctor, therapy' : m.name === 'Family' ? 'spouse, kids, date night, school, home' : m.name === 'Recharge' ? 'movie, rest, vacation, game' : m.name === 'Finance' ? 'invoice, bill, budget, tax, payment' : m.name === 'Growth' ? 'course, book, learn, build, practice' : 'words that appear in your ' + m.name.toLowerCase() + ' tasks'}"
+            placeholder="e.g. ${m.name === 'Faith' ? 'church, prayer, pastor, devotion, Bible' : m.name === 'Health' ? 'gym, workout, run, doctor, therapy' : m.name === 'Family' ? 'spouse, kids, date night, school, home' : m.name === 'Recharge' ? 'movie, rest, vacation, game' : m.name === 'Personal Finance' ? 'budget, debt, savings, mortgage, bills, credit card' : m.name === 'Growth' ? 'course, book, learn, build, practice' : 'words that appear in your ' + m.name.toLowerCase() + ' tasks'}"
             value="${m.context || ''}"
             onclick="event.stopPropagation()"
             onchange="obMetrics[${i}].context=this.value"
@@ -2946,7 +2946,7 @@ async function refineLifeBalance() {
   // Get current life categories
   let categories = userLifeCategories.length > 0 ? userLifeCategories : [
     { name: 'Work' }, { name: 'Family' }, { name: 'Health' },
-    { name: 'Faith' }, { name: 'Finance' }, { name: 'Growth' }, { name: 'Recharge' }
+    { name: 'Faith' }, { name: 'Personal Finance' }, { name: 'Growth' }, { name: 'Recharge' }
   ];
 
   const categoryNames = categories.filter(c => c.active !== false).map(c => c.name).join(', ');

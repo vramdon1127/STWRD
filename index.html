@@ -1027,7 +1027,7 @@ const SUPABASE_URL = 'https://fnnegalrrdzcgoelljmi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZubmVnYWxycmR6Y2dvZWxsam1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDMwNjksImV4cCI6MjA5MTUxOTA2OX0.bhgk6czCQYTuUGnu5Zv7pml9uMuPrp4I1VBSzVIHwqw';
 
 // ─── SUPABASE AUTH CLIENT ─────────────────────────────────────
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── STATE ────────────────────────────────────────────────────
 let tasks = [];
@@ -1047,7 +1047,7 @@ let corrections = [];
 
 window.addEventListener('load', async () => {
   // Check auth state
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sbClient.auth.getSession();
   
   if (!session) {
     showAuthScreen();
@@ -1057,7 +1057,7 @@ window.addEventListener('load', async () => {
   // Auth callback handling (after Google redirect)
   const hash = window.location.hash;
   if (hash && hash.includes('access_token')) {
-    const { data: { session: newSession } } = await supabase.auth.getSession();
+    const { data: { session: newSession } } = await sbClient.auth.getSession();
     if (newSession) {
       window.location.hash = '';
       await initApp(newSession.user);
@@ -1069,7 +1069,7 @@ window.addEventListener('load', async () => {
 });
 
 // Handle auth state changes
-supabase.auth.onAuthStateChange(async (event, session) => {
+sbClient.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session) {
     window.location.hash = '';
     await initApp(session.user);
@@ -1114,11 +1114,11 @@ async function initApp(user) {
 
 async function loadProfile(user) {
   try {
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data } = await sbClient.from('profiles').select('*').eq('id', user.id).single();
     return data;
   } catch(e) {
     // Create profile if doesn't exist
-    const { data } = await supabase.from('profiles').insert({
+    const { data } = await sbClient.from('profiles').insert({
       id: user.id,
       full_name: user.user_metadata?.full_name,
       avatar_url: user.user_metadata?.avatar_url,
@@ -1147,7 +1147,7 @@ function hideAuthScreens() {
 }
 
 async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { error } = await sbClient.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: window.location.origin
@@ -1171,7 +1171,7 @@ function toggleUserMenu() {
 }
 
 async function signOut() {
-  await supabase.auth.signOut();
+  await sbClient.auth.signOut();
   localStorage.removeItem('apiKey');
   localStorage.removeItem('advisorCache');
   localStorage.removeItem('advisorFingerprint');
@@ -1217,7 +1217,7 @@ function setupRealtime() {
 // ─── SUPABASE HELPERS ─────────────────────────────────────────
 async function sbFetch(path, method = 'GET', body = null) {
   // Get current session token for RLS
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sbClient.auth.getSession();
   const token = session?.access_token || SUPABASE_KEY;
   
   const opts = {
@@ -2278,7 +2278,7 @@ async function saveApiKey() {
   if (!key) return;
   localStorage.setItem('apiKey', key);
   try {
-    await supabase.from('profiles').upsert({ id: currentUserId, anthropic_key: key });
+    await sbClient.from('profiles').upsert({ id: currentUserId, anthropic_key: key });
   } catch(e) {}
   showToast('✓ API key saved');
 }
@@ -2724,7 +2724,7 @@ async function completeOnboarding() {
 
   try {
     // Save profile
-    await supabase.from('profiles').upsert({
+    await sbClient.from('profiles').upsert({
       id: currentUserId,
       full_name: name,
       anthropic_key: apiKey,
@@ -2741,7 +2741,7 @@ async function completeOnboarding() {
       color: p.color,
       sort_order: i,
     }));
-    await supabase.from('projects').insert(projectsToInsert);
+    await sbClient.from('projects').insert(projectsToInsert);
 
     // Save life categories
     const metricsToInsert = obMetrics.map((m, i) => ({
@@ -2754,7 +2754,7 @@ async function completeOnboarding() {
       sort_order: i,
       active: m.active,
     }));
-    await supabase.from('life_categories').insert(metricsToInsert);
+    await sbClient.from('life_categories').insert(metricsToInsert);
 
     // Save API key locally
     localStorage.setItem('apiKey', apiKey);
@@ -2892,7 +2892,7 @@ async function saveDigestSettings() {
   if (!email) { showToast('⚠️ Enter your email address'); return; }
 
   try {
-    await supabase.from('profiles').upsert({
+    await sbClient.from('profiles').upsert({
       id: currentUserId,
       digest_email: email,
       resend_key: resendKey || null,
@@ -2923,7 +2923,7 @@ async function testDigest() {
 async function loadDigestSettings() {
   try {
     if (!currentUserId) return;
-    const { data } = await supabase.from('profiles').select('digest_email,resend_key,anthropic_key').eq('id', currentUserId).single();
+    const { data } = await sbClient.from('profiles').select('digest_email,resend_key,anthropic_key').eq('id', currentUserId).single();
     if (data?.digest_email) document.getElementById('digestEmailInput').value = data.digest_email;
     if (data?.resend_key) document.getElementById('resendKeyInput').value = data.resend_key;
   } catch(e) {}

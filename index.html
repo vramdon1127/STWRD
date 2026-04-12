@@ -1272,7 +1272,7 @@ function renderProjectTasks() {
             ${task.category ? `<span class="tag ${catClass}">${task.category}</span>` : ''}
             ${task.priority ? `<span class="tag ${priClass}">${task.priority}</span>` : ''}
             ${task.added_by ? `<span class="tag tag-added-by">${task.added_by}</span>` : ''}
-            ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date}</span>` : ''}
+            ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date.split('-').slice(1).concat(task.due_date.split('-')[0]).join('/')}</span>` : ''}
           </div>
           <div class="task-actions">
             ${isAiComplete ? `<button class="task-action-btn ai-run" onclick="runAiTask('${task.id}')">🤖 Run with AI</button>` : ''}

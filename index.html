@@ -1030,7 +1030,7 @@ REASON: [one short sentence why]
 
 Priority guide: P1=urgent/today, P2=important/this week, P3=normal, P4=low/someday
 Category guide: AI Complete=AI can fully do it without Vijay, AI Assist=needs Vijay's input, Manual=must be done by Vijay alone
-Due date guide: Extract any date mentioned. Today is ${new Date().toISOString().split('T')[0]}.
+Due date guide: Extract any date mentioned. Today is ${new Date().toLocaleDateString('en-CA', {timeZone: 'America/Chicago'})}.
 - "today" or "tonight" or "this evening" = today's date
 - "tomorrow" = tomorrow's date
 - "this week" = this Friday

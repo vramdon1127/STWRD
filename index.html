@@ -1358,9 +1358,101 @@ async function renderStats() {
   const vijayCount = active.filter(t => t.added_by === 'Vijay').length;
   const miaCount = active.filter(t => t.added_by === 'Mia').length;
 
+  // ── LIFE BALANCE SCORING ──────────────────────────────────
+  const lifeCategories = [
+    {
+      name: 'Work', icon: '💼', color: '#60a5fa',
+      keywords: ['invoice', 'client', 'meeting', 'email', 'caliber', 'gne', 'sox', 'audit', 'serveants', 'tax', 'honeybook', 'vibo', 'booking'],
+      goal: 5, unit: 'tasks/week',
+      advice: { low: 'Work tasks are piling up — focus time needed', high: 'Work output is strong this week' }
+    },
+    {
+      name: 'Family', icon: '🏠', color: '#34d399',
+      keywords: ['mia', 'baby', 'home', 'house', 'birthday', 'gift', 'party', 'nursery', 'paint', 'mattress', 'depot', 'crue', 'jada'],
+      goal: 2, unit: 'tasks/week',
+      advice: { low: 'Family tasks are getting sidelined — Mia notices', high: 'Family is getting real attention this week' }
+    },
+    {
+      name: 'Health', icon: '💪', color: '#fb923c',
+      keywords: ['workout', 'gym', 'exercise', 'run', 'walk', 'doctor', 'sleep', 'eat', 'diet', 'health', 'mental', 'meditat'],
+      goal: 3, unit: 'tasks/week',
+      advice: { low: "No health tasks this week — Mia's watching 👀", high: "Taking care of yourself this week" }
+    },
+    {
+      name: 'Faith', icon: '🙏', color: '#a78bfa',
+      keywords: ['church', 'pray', 'devotion', 'bible', 'worship', 'faith', 'sermon', 'ministry', 'god', 'spiritual'],
+      goal: 1, unit: 'task/week',
+      advice: { low: "Faith hasn't shown up in your tasks this week", high: "Faith is present in your week" }
+    },
+    {
+      name: 'Finance', icon: '💰', color: '#fbbf24',
+      keywords: ['invoice', 'payment', 'bill', 'budget', 'tax', 'money', 'zelle', 'deposit', 'proconnect', 'plaid'],
+      goal: 2, unit: 'tasks/week',
+      advice: { low: 'Financial tasks getting delayed — cash flow at risk', high: 'Staying on top of finances' }
+    },
+    {
+      name: 'Growth', icon: '🌱', color: '#38bdf8',
+      keywords: ['learn', 'read', 'course', 'study', 'book', 'research', 'build', 'app', 'skill', 'improve', 'practice'],
+      goal: 1, unit: 'task/week',
+      advice: { low: 'No personal growth this week — easy to skip', high: 'Investing in yourself this week' }
+    },
+    {
+      name: 'Recharge', icon: '🎮', color: '#6b7280',
+      keywords: ['game', 'video', 'play', 'rest', 'relax', 'netflix', 'movie', 'tv', 'break', 'vacation'],
+      goal: 1, unit: 'session/week — Mia says cap it here 😄',
+      advice: { low: "No recharge logged — or Mia deleted the evidence", high: "Getting rest — just not too much 😄" }
+    },
+  ];
+
+  // Score each category based on tasks added this week
+  const allThisWeek = [...active, ...completed.filter(t => t.created_at >= weekAgoStr)];
+  const lifeScores = lifeCategories.map(cat => {
+    const matched = allThisWeek.filter(t => {
+      const text = ((t.cleaned_task || t.content) + ' ' + (t.project || '')).toLowerCase();
+      return cat.keywords.some(k => text.includes(k));
+    });
+    const score = Math.min(matched.length, cat.goal);
+    const pct = Math.round((score / cat.goal) * 100);
+    return { ...cat, score, pct, matched: matched.length };
+  });
+
+  const avgLifeScore = Math.round(lifeScores.reduce((a,b) => a + b.pct, 0) / lifeScores.length);
+
   el.innerHTML = `
     <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">Dashboard</div>
     <div style="color:var(--text2);font-size:13px;margin-bottom:20px;">Your life at a glance</div>
+
+    <!-- LIFE BALANCE SCORE -->
+    <div class="stat-card" style="margin-bottom:16px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#60a5fa,#34d399,#fb923c,#a78bfa,#fbbf24,#38bdf8);"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);">Life Balance</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">Mia's idea 💡</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:'Syne',sans-serif;font-size:36px;font-weight:800;color:${avgLifeScore >= 70 ? '#34d399' : avgLifeScore >= 40 ? '#fbbf24' : '#ef4444'};">${avgLifeScore}</div>
+          <div style="font-size:11px;color:var(--text2);">/ 100</div>
+        </div>
+      </div>
+      ${lifeScores.map(cat => `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:14px;">${cat.icon}</span>
+              <span style="font-size:13px;font-weight:500;">${cat.name}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:11px;color:var(--text2);">${cat.matched}/${cat.goal}</span>
+              <span style="font-size:11px;font-weight:700;color:${cat.pct >= 100 ? cat.color : cat.pct >= 50 ? '#fbbf24' : '#ef4444'};">${cat.pct >= 100 ? '✓' : cat.pct >= 50 ? '~' : '!'}</span>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;">
+            <div style="width:${Math.min(cat.pct,100)}%;height:100%;background:${cat.color};border-radius:4px;transition:width 0.5s;"></div>
+          </div>
+          ${cat.pct < 50 ? `<div style="font-size:11px;color:var(--text2);margin-top:3px;padding-left:22px;">${cat.advice.low}</div>` : ''}
+        </div>`).join('')}
+    </div>
 
     <!-- AI ADVISOR PLACEHOLDER -->
     <div id="aiAdvisorCard" class="stat-card" style="margin-bottom:16px;border-color:rgba(108,99,255,0.4);position:relative;overflow:hidden;">
@@ -1456,10 +1548,10 @@ async function renderStats() {
   `;
 
   // Load AI advisor asynchronously
-  loadAiAdvisor(active, today, completionRate, completedThisWeek);
+  loadAiAdvisor(active, today, completionRate, completedThisWeek, lifeScores);
 }
 
-async function loadAiAdvisor(active, today, completionRate, completedThisWeek) {
+async function loadAiAdvisor(active, today, completionRate, completedThisWeek, lifeScores = []) {
   const apiKey = localStorage.getItem('apiKey');
   if (!apiKey || active.length === 0) {
     const el = document.getElementById('aiAdvisorContent');
@@ -1482,7 +1574,7 @@ async function loadAiAdvisor(active, today, completionRate, completedThisWeek) {
     `[${t.project}][${t.category}][${t.priority}]${t.due_date ? '[due:'+t.due_date+']' : ''} ${t.cleaned_task || t.content}`
   ).join('\n');
 
-  const prompt = `You are Vijay Ramdon's personal AI chief of staff. Analyze his current tasks and give him 3 specific, actionable insights.
+  const prompt = `You are Vijay Ramdon's personal AI chief of staff. His wife Mia wants him to have better life balance. Analyze his tasks and life balance and give him 3 specific, actionable insights.
 
 His tasks right now:
 ${taskSummary}
@@ -1491,7 +1583,10 @@ Today: ${today}
 Completion rate this week: ${completionRate}%
 Completed this week: ${completedThisWeek}
 
-Give exactly 3 insights in this format — be specific, mention actual task names, be direct and encouraging:
+Life balance this week (0-100% of weekly goal):
+${(lifeScores||[]).map(c => c.name + ': ' + c.pct + '% (' + c.matched + '/' + c.goal + ' tasks)').join(', ')}
+
+Give exactly 3 insights — mix task productivity AND life balance. Be specific, mention actual task names, be direct and warm. Mia is watching 😄:
 INSIGHT1_EMOJI: [emoji]
 INSIGHT1_TITLE: [short bold title]
 INSIGHT1_BODY: [1-2 sentences of specific advice]

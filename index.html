@@ -1291,7 +1291,6 @@ async function renderStats() {
   const el = document.getElementById('statsGrid');
   if (!el) return;
 
-  // Fetch completed tasks from last 30 days
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const since = thirtyDaysAgo.toISOString();
@@ -1306,7 +1305,6 @@ async function renderStats() {
   weekAgo.setDate(weekAgo.getDate() - 7);
   const weekAgoStr = weekAgo.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
 
-  // Active tasks stats
   const active = tasks;
   const total = active.length;
   const p1 = active.filter(t => t.priority === 'P1').length;
@@ -1314,13 +1312,9 @@ async function renderStats() {
   const aiComplete = active.filter(t => t.category === 'AI Complete').length;
   const aiAssist = active.filter(t => t.category === 'AI Assist').length;
   const manual = active.filter(t => t.category === 'Manual').length;
-
-  // Completed this week
   const completedThisWeek = completed.filter(t => t.created_at >= weekAgoStr).length;
   const addedThisWeek = active.filter(t => t.created_at >= weekAgoStr).length + completedThisWeek;
   const completionRate = addedThisWeek > 0 ? Math.round((completedThisWeek / addedThisWeek) * 100) : 0;
-
-  // Project breakdown
   const projData = [
     { name: 'GNE', color: 'var(--gne)', count: active.filter(t => t.project === 'GNE').length },
     { name: 'Caliber', color: 'var(--caliber)', count: active.filter(t => t.project === 'Caliber').length },
@@ -1328,33 +1322,38 @@ async function renderStats() {
     { name: 'ServeAnts', color: 'var(--servents)', count: active.filter(t => t.project === 'ServeAnts').length },
   ];
   const maxProj = Math.max(...projData.map(p => p.count), 1);
-
-  // Category breakdown
   const totalCat = aiComplete + aiAssist + manual || 1;
   const aiPct = Math.round(((aiComplete + aiAssist) / totalCat) * 100);
-
-  // Who adds more tasks
   const vijayCount = active.filter(t => t.added_by === 'Vijay').length;
   const miaCount = active.filter(t => t.added_by === 'Mia').length;
 
   el.innerHTML = `
-    <!-- HEADER -->
     <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">Dashboard</div>
-    <div style="color:var(--text2);font-size:13px;margin-bottom:20px;">Last updated just now</div>
+    <div style="color:var(--text2);font-size:13px;margin-bottom:20px;">Your life at a glance</div>
+
+    <!-- AI ADVISOR PLACEHOLDER -->
+    <div id="aiAdvisorCard" class="stat-card" style="margin-bottom:16px;border-color:rgba(108,99,255,0.4);position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent3));"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="font-size:20px;">🧠</div>
+        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--accent);">AI Advisor</div>
+      </div>
+      <div id="aiAdvisorContent" style="color:var(--text2);font-size:13px;">Analyzing your tasks...</div>
+    </div>
 
     <!-- TOP STATS ROW -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
-      <div class="stat-card" style="border-color:rgba(108,99,255,0.3);">
+      <div class="stat-card" onclick="showView('capture')" style="border-color:rgba(108,99,255,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='rgba(108,99,255,0.3)'">
         <div class="stat-value" style="color:var(--accent)">${total}</div>
-        <div class="stat-label">Active Tasks</div>
+        <div class="stat-label">Active Tasks →</div>
       </div>
-      <div class="stat-card" style="border-color:rgba(255,68,68,0.3);">
+      <div class="stat-card" onclick="showView('capture')" style="border-color:rgba(255,68,68,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--p1)'" onmouseout="this.style.borderColor='rgba(255,68,68,0.3)'">
         <div class="stat-value" style="color:var(--p1)">${p1}</div>
-        <div class="stat-label">Urgent (P1)</div>
+        <div class="stat-label">Urgent (P1) →</div>
       </div>
-      <div class="stat-card" style="border-color:rgba(67,233,123,0.3);">
+      <div class="stat-card" onclick="showView('today')" style="border-color:rgba(67,233,123,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='rgba(67,233,123,0.3)'">
         <div class="stat-value" style="color:var(--accent3)">${dueToday}</div>
-        <div class="stat-label">Due Today</div>
+        <div class="stat-label">Due Today →</div>
       </div>
       <div class="stat-card" style="border-color:rgba(67,233,123,0.3);">
         <div class="stat-value" style="color:var(--accent3)">${completedThisWeek}</div>
@@ -1369,7 +1368,7 @@ async function renderStats() {
         <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${completionRate >= 70 ? 'var(--accent3)' : completionRate >= 40 ? 'var(--p2)' : 'var(--accent2)'};">${completionRate}%</div>
       </div>
       <div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden;">
-        <div style="width:${completionRate}%;height:100%;background:${completionRate >= 70 ? 'var(--accent3)' : completionRate >= 40 ? 'var(--p2)' : 'var(--accent2)'};border-radius:6px;transition:width 0.5s;"></div>
+        <div style="width:${completionRate}%;height:100%;background:${completionRate >= 70 ? 'var(--accent3)' : completionRate >= 40 ? 'var(--p2)' : 'var(--accent2)'};border-radius:6px;"></div>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px;">${completedThisWeek} completed of ${addedThisWeek} added this week</div>
     </div>
@@ -1378,10 +1377,10 @@ async function renderStats() {
     <div class="stat-card" style="margin-bottom:16px;">
       <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:14px;">Project Breakdown</div>
       ${projData.map(p => `
-        <div style="margin-bottom:12px;">
+        <div style="margin-bottom:12px;cursor:pointer;" onclick="openProject('${p.name}');showView('capture');">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="font-size:13px;">${p.name}</span>
-            <span style="font-size:13px;color:${p.color};font-weight:600;">${p.count} tasks</span>
+            <span style="font-size:13px;color:${p.color};font-weight:600;">${p.name} →</span>
+            <span style="font-size:13px;color:var(--text2);">${p.count} tasks</span>
           </div>
           <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden;">
             <div style="width:${Math.round((p.count/maxProj)*100)}%;height:100%;background:${p.color};border-radius:4px;"></div>
@@ -1406,9 +1405,7 @@ async function renderStats() {
           <div style="font-size:11px;color:var(--text2);margin-top:2px;">Manual</div>
         </div>
       </div>
-      <div style="margin-top:12px;font-size:13px;color:var(--text2);text-align:center;">
-        ${aiPct}% of your tasks can be helped or completed by AI
-      </div>
+      <div style="margin-top:12px;font-size:13px;color:var(--text2);text-align:center;">${aiPct}% of your tasks can be helped or completed by AI</div>
     </div>
 
     <!-- WHO ADDS MORE -->
@@ -1426,6 +1423,81 @@ async function renderStats() {
       </div>
     </div>
   `;
+
+  // Load AI advisor asynchronously
+  loadAiAdvisor(active, today, completionRate, completedThisWeek);
+}
+
+async function loadAiAdvisor(active, today, completionRate, completedThisWeek) {
+  const apiKey = localStorage.getItem('apiKey');
+  if (!apiKey || active.length === 0) {
+    const el = document.getElementById('aiAdvisorContent');
+    if (el) el.innerHTML = '<span style="color:var(--text2);">Add tasks and an API key to get AI insights.</span>';
+    return;
+  }
+
+  const taskSummary = active.slice(0, 30).map(t =>
+    `[${t.project}][${t.category}][${t.priority}]${t.due_date ? '[due:'+t.due_date+']' : ''} ${t.cleaned_task || t.content}`
+  ).join('\n');
+
+  const prompt = `You are Vijay Ramdon's personal AI chief of staff. Analyze his current tasks and give him 3 specific, actionable insights.
+
+His tasks right now:
+${taskSummary}
+
+Today: ${today}
+Completion rate this week: ${completionRate}%
+Completed this week: ${completedThisWeek}
+
+Give exactly 3 insights in this format — be specific, mention actual task names, be direct and encouraging:
+INSIGHT1_EMOJI: [emoji]
+INSIGHT1_TITLE: [short bold title]
+INSIGHT1_BODY: [1-2 sentences of specific advice]
+INSIGHT2_EMOJI: [emoji]
+INSIGHT2_TITLE: [short bold title]
+INSIGHT2_BODY: [1-2 sentences of specific advice]
+INSIGHT3_EMOJI: [emoji]
+INSIGHT3_TITLE: [short bold title]
+INSIGHT3_BODY: [1-2 sentences of specific advice]
+
+Focus on: quick wins, stress reduction, what AI can do for him, overdue items, or patterns you notice.`;
+
+  try {
+    const response = await fetch('/api/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, apiKey, maxTokens: 400 })
+    });
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+
+    const get = (key) => {
+      const match = text.match(new RegExp(key + ': (.+)'));
+      return match ? match[1].trim() : '';
+    };
+
+    const insights = [1,2,3].map(i => ({
+      emoji: get(`INSIGHT${i}_EMOJI`),
+      title: get(`INSIGHT${i}_TITLE`),
+      body: get(`INSIGHT${i}_BODY`)
+    })).filter(i => i.title);
+
+    const el = document.getElementById('aiAdvisorContent');
+    if (!el || insights.length === 0) return;
+
+    el.innerHTML = insights.map(i => `
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="font-size:18px;">${i.emoji}</span>
+          <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;">${i.title}</span>
+        </div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.5;padding-left:26px;">${i.body}</div>
+      </div>`).join('').replace(/border-bottom:1px solid var\(--border\);">\s*$/, '">');
+
+  } catch(e) {
+    const el = document.getElementById('aiAdvisorContent');
+    if (el) el.innerHTML = '<span style="color:var(--text2);">Could not load insights right now.</span>';
+  }
 }
 
 // ─── UI HELPERS ───────────────────────────────────────────────

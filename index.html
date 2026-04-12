@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Steward">
-<title>Steward</title>
+<meta name="apple-mobile-web-app-title" content="STWRD">
+<title>STWRD</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -685,7 +685,7 @@
 
 <header>
   <div class="logo" onclick="showView('capture')" style="cursor:pointer;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Steward</div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>STWRD</div>
   <div class="user-badge" onclick="switchUser()">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
     <span id="currentUser">Vijay</span>
@@ -763,6 +763,18 @@
     <div id="drilldownList"></div>
   </div>
 
+
+  <!-- PROGRESS VIEW -->
+  <div class="view" id="view-progress">
+    <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">30-Day Journey</div>
+    <div style="color:var(--text2);font-size:13px;margin-bottom:20px;">Tracking your stewardship over time</div>
+    <div id="progressContent">
+      <div style="text-align:center;padding:40px;color:var(--text2);">
+        <div style="font-size:32px;margin-bottom:12px;">📈</div>
+        <div style="font-family:'Syne',sans-serif;font-size:16px;color:var(--text);margin-bottom:6px;">Loading your journey...</div>
+      </div>
+    </div>
+  </div>
   <!-- SETTINGS VIEW -->
   <div class="view" id="view-settings">
     <div class="settings-section">
@@ -801,7 +813,7 @@
     <div class="settings-section">
       <div class="settings-row" style="cursor: default; flex-direction: column; align-items: flex-start;">
         <div class="settings-label" style="font-weight: 600;">About</div>
-        <div class="settings-value" style="margin-top: 4px;">Steward v1.0 · Built for Vijay & Family</div>
+        <div class="settings-value" style="margin-top: 4px;">STWRD v1.0 · Built for Vijay & Family</div>
       </div>
     </div>
   </div>
@@ -820,6 +832,10 @@
   <button class="nav-item" id="nav-stats" onclick="showView('stats')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
     Dashboard
+  </button>
+  <button class="nav-item" id="nav-progress" onclick="showView('progress')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Journey
   </button>
   <button class="nav-item" id="nav-settings" onclick="showView('settings')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -912,6 +928,7 @@ window.addEventListener('load', () => {
   loadKnowledge();
   loadCorrections();
   loadTasks();
+  setTimeout(saveWeeklySnapshot, 5000); // auto-save snapshot after tasks load
   setupRealtime();
 });
 
@@ -1029,7 +1046,7 @@ async function processTask() {
     const pers = knowledgeBase['Personal'] || 'Personal life tasks';
     const sa = knowledgeBase['ServeAnts'] || 'ServeAnts CPA LLC';
 
-    const prompt = `You are Steward, a personal AI life manager for Vijay Ramdon. He runs multiple ventures:
+    const prompt = `You are STWRD, a personal AI life manager for Vijay Ramdon. He runs multiple ventures:
 
 GNE: ${gne}
 
@@ -1137,7 +1154,7 @@ async function runAiTask(taskId) {
     const gneContext = `GNE CONTEXT: Luxury DJ/MC company in Dallas TX. Vijay's voice is warm, faith-aligned, personal. Key phrases: "We would be absolutely HONORED", "Can't wait to make it an amazing night!". Packages: Elegant ($2,600-$3,200), Signature ($3,600-$4,400), Luxurious ($5,000-$6,200). Tools: HoneyBook, VIBO. MCs: Caleb, Jono. Always write in first person as Vijay. End with a clear next step. Scheduling link: https://bit.ly/GNEVideoCall`;
     const caliberContext = `CALIBER CONTEXT: Vijay is Director of Internal Controls at Caliber Collision. SOX compliance with PwC as external auditor and Protiviti as co-sourced IA. Key systems: Workday, CCC ONE, FastPath, Workiva, CertiTrack. Active projects: UAR/SOD cycles, AP narrative, account reconciliation tool, DOA rollout. Key contacts: Grant Willard, Craig James, Amit Patel, Jessica Knabe, Yvette Dubey. Communication style: professional, concise, no filler. Go straight to the revision. Peer-level tone with auditors. Write in first person as Vijay.`;
     const projectContext = task.project === 'GNE' ? gneContext : task.project === 'Caliber' ? caliberContext : '';
-    const aiPrompt = `You are Steward, Vijay Ramdon's personal AI. Complete this task fully and present the result clearly. ${projectContext}\n\nTask: ${task.cleaned_task || task.content}\n\nProvide the complete deliverable ready to use — draft the email, write the script, create the timeline, etc. Don't explain what you're doing, just do it.`;
+    const aiPrompt = `You are STWRD, Vijay Ramdon's personal AI. Complete this task fully and present the result clearly. ${projectContext}\n\nTask: ${task.cleaned_task || task.content}\n\nProvide the complete deliverable ready to use — draft the email, write the script, create the timeline, etc. Don't explain what you're doing, just do it.`;
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1597,7 +1614,7 @@ async function loadAiAdvisor(active, today, completionRate, completedThisWeek, l
     `[${t.project}][${t.category}][${t.priority}]${t.due_date ? '[due:'+t.due_date+']' : ''} ${t.cleaned_task || t.content}`
   ).join('\n');
 
-  const prompt = `You are Steward, Vijay Ramdon's personal AI life manager. His wife Mia wants him to have better life balance. Analyze his tasks and life balance and give him 3 specific, actionable insights.
+  const prompt = `You are STWRD, Vijay Ramdon's personal AI life manager. His wife Mia wants him to have better life balance. Analyze his tasks and life balance and give him 3 specific, actionable insights.
 
 His tasks right now:
 ${taskSummary}
@@ -1672,6 +1689,7 @@ function showView(name) {
   document.getElementById(`view-${name}`).classList.add('active');
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'stats') renderStats();
+  if (name === 'progress') renderProgress();
   if (name === 'settings') loadKnowledgeEditor();
   if (name === 'today') renderToday();
 }
@@ -2014,6 +2032,290 @@ function showToast(msg) {
   setTimeout(() => t.remove(), 3000);
 }
 
+
+// ─── SNAPSHOT SYSTEM ──────────────────────────────────────────
+async function saveWeeklySnapshot() {
+  try {
+    const today = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
+    const weekStart = getWeekStart();
+
+    // Check if we already saved this week
+    const existing = await sbFetch(`snapshots?week_start=eq.${weekStart}&limit=1`);
+    if (existing && existing.length > 0) return; // already saved this week
+
+    const active = tasks;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 7);
+    const since = thirtyDaysAgo.toISOString();
+    let completed = [];
+    try { completed = await sbFetch(`tasks?status=eq.done&created_at=gte.${since}&limit=200`) || []; } catch(e) {}
+
+    const total = active.length;
+    const p1 = active.filter(t => t.priority === 'P1').length;
+    const completedCount = completed.length;
+    const addedCount = active.length + completedCount;
+    const completionRate = addedCount > 0 ? Math.round((completedCount / addedCount) * 100) : 0;
+
+    const projCounts = {
+      gne: active.filter(t => t.project === 'GNE').length,
+      caliber: active.filter(t => t.project === 'Caliber').length,
+      personal: active.filter(t => t.project === 'Personal').length,
+      serveants: active.filter(t => t.project === 'ServeAnts').length,
+    };
+
+    // Life balance scores
+    const lifeCategories = [
+      { name: 'Work', keywords: ['invoice','client','meeting','email','caliber','gne','sox','audit','serveants','tax','honeybook','vibo','booking'], goal: 5 },
+      { name: 'Family', keywords: ['mia','baby','home','house','birthday','gift','party','nursery','paint','mattress','depot','crue','jada'], goal: 2 },
+      { name: 'Health', keywords: ['workout','gym','exercise','run','walk','doctor','sleep','eat','diet','health','mental','meditat'], goal: 3 },
+      { name: 'Faith', keywords: ['church','pray','devotion','bible','worship','faith','sermon','ministry','god','spiritual'], goal: 1 },
+      { name: 'Finance', keywords: ['invoice','payment','bill','budget','tax','money','zelle','deposit','proconnect','plaid'], goal: 2 },
+      { name: 'Growth', keywords: ['learn','read','course','study','book','research','build','app','skill','improve','practice'], goal: 1 },
+      { name: 'Recharge', keywords: ['game','video','play','rest','relax','netflix','movie','tv','break','vacation'], goal: 1 },
+    ];
+
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStr = weekAgo.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
+    const allThisWeek = [...active, ...completed.filter(t => t.created_at >= weekAgoStr)];
+
+    const lifeScores = {};
+    lifeCategories.forEach(cat => {
+      const matched = allThisWeek.filter(t => {
+        const text = ((t.cleaned_task || t.content) + ' ' + (t.project || '')).toLowerCase();
+        return cat.keywords.some(k => text.includes(k));
+      }).length;
+      const pct = Math.round((matched / cat.goal) * 100);
+      lifeScores[cat.name.toLowerCase()] = Math.min(pct, 200); // cap at 200%
+    });
+
+    const basePcts = Object.values(lifeScores).map(p => Math.min(p, 100));
+    const baseAvg = basePcts.reduce((a,b) => a+b, 0) / basePcts.length;
+    const totalOverflow = Object.values(lifeScores).reduce((a,p) => a + Math.max(0, p-100), 0);
+    const zeroCount = Object.values(lifeScores).filter(p => p === 0).length;
+    const overflowCredit = Math.min(totalOverflow * 0.05, zeroCount * 10);
+    const lifeScore = Math.min(100, Math.round(baseAvg + overflowCredit));
+
+    await sbFetch('snapshots', 'POST', {
+      week_start: weekStart,
+      snapshot_date: today,
+      life_score: lifeScore,
+      completion_rate: completionRate,
+      active_tasks: total,
+      completed_tasks: completedCount,
+      p1_tasks: p1,
+      proj_gne: projCounts.gne,
+      proj_caliber: projCounts.caliber,
+      proj_personal: projCounts.personal,
+      proj_serveants: projCounts.serveants,
+      life_work: lifeScores['work'] || 0,
+      life_family: lifeScores['family'] || 0,
+      life_health: lifeScores['health'] || 0,
+      life_faith: lifeScores['faith'] || 0,
+      life_finance: lifeScores['finance'] || 0,
+      life_growth: lifeScores['growth'] || 0,
+      life_recharge: lifeScores['recharge'] || 0,
+    });
+    console.log('STWRD: Weekly snapshot saved for', weekStart);
+  } catch(e) {
+    console.log('Snapshot save failed (table may not exist yet):', e.message);
+  }
+}
+
+function getWeekStart() {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const diff = now.getDate() - day;
+  const sunday = new Date(now.setDate(diff));
+  return sunday.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
+}
+
+async function renderProgress() {
+  const el = document.getElementById('progressContent');
+  if (!el) return;
+
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);">Loading your journey...</div>';
+
+  let snapshots = [];
+  try {
+    snapshots = await sbFetch('snapshots?order=week_start.asc&limit=12') || [];
+  } catch(e) {
+    el.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:12px;">🗄️</div>
+        <div style="font-family:'Syne',sans-serif;font-size:16px;margin-bottom:8px;">One-time setup needed</div>
+        <div style="color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:16px;">Create a <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;">snapshots</code> table in Supabase to track your 30-day journey.</div>
+        <div style="background:var(--surface2);border-radius:10px;padding:14px;text-align:left;font-size:12px;color:var(--text2);font-family:monospace;line-height:1.8;">
+          create table snapshots (<br>
+          &nbsp;&nbsp;id uuid default gen_random_uuid() primary key,<br>
+          &nbsp;&nbsp;week_start date not null unique,<br>
+          &nbsp;&nbsp;snapshot_date date,<br>
+          &nbsp;&nbsp;life_score int,<br>
+          &nbsp;&nbsp;completion_rate int,<br>
+          &nbsp;&nbsp;active_tasks int,<br>
+          &nbsp;&nbsp;completed_tasks int,<br>
+          &nbsp;&nbsp;p1_tasks int,<br>
+          &nbsp;&nbsp;proj_gne int, proj_caliber int,<br>
+          &nbsp;&nbsp;proj_personal int, proj_serveants int,<br>
+          &nbsp;&nbsp;life_work int, life_family int,<br>
+          &nbsp;&nbsp;life_health int, life_faith int,<br>
+          &nbsp;&nbsp;life_finance int, life_growth int,<br>
+          &nbsp;&nbsp;life_recharge int,<br>
+          &nbsp;&nbsp;created_at timestamptz default now()<br>
+          );
+        </div>
+        <button onclick="saveWeeklySnapshot().then(()=>renderProgress())" style="margin-top:16px;width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Save First Snapshot</button>
+      </div>`;
+    return;
+  }
+
+  if (snapshots.length === 0) {
+    el.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:12px;">🌱</div>
+        <div style="font-family:'Syne',sans-serif;font-size:18px;margin-bottom:8px;">Day 1 starts now</div>
+        <div style="color:var(--text2);font-size:14px;margin-bottom:20px;">Save your first snapshot to begin tracking your 30-day journey.</div>
+        <button onclick="saveWeeklySnapshot().then(()=>renderProgress())" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">
+          📸 Save Week 1 Snapshot
+        </button>
+      </div>`;
+    return;
+  }
+
+  const latest = snapshots[snapshots.length - 1];
+  const first = snapshots[0];
+  const scoreDelta = latest.life_score - first.life_score;
+  const weekCount = snapshots.length;
+  const daysIn = Math.min(30, weekCount * 7);
+  const daysLeft = Math.max(0, 30 - daysIn);
+
+  // Build life score sparkline data
+  const maxScore = Math.max(...snapshots.map(s => s.life_score), 1);
+  const sparkH = 60;
+  const sparkW = 260;
+  const pts = snapshots.map((s, i) => {
+    const x = snapshots.length === 1 ? sparkW/2 : (i / (snapshots.length - 1)) * sparkW;
+    const y = sparkH - (s.life_score / 100) * sparkH;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const lifeCategories = [
+    { key: 'life_work', name: 'Work', color: '#60a5fa', icon: '💼' },
+    { key: 'life_family', name: 'Family', color: '#34d399', icon: '🏠' },
+    { key: 'life_health', name: 'Health', color: '#fb923c', icon: '💪' },
+    { key: 'life_faith', name: 'Faith', color: '#a78bfa', icon: '🙏' },
+    { key: 'life_finance', name: 'Finance', color: '#fbbf24', icon: '💰' },
+    { key: 'life_growth', name: 'Growth', color: '#38bdf8', icon: '🌱' },
+    { key: 'life_recharge', name: 'Recharge', color: '#6b7280', icon: '🎮' },
+  ];
+
+  el.innerHTML = `
+    <!-- HEADER STATS -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--accent);">${daysIn}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px;">Days In</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:${daysLeft === 0 ? 'var(--personal)' : 'var(--text)'};">${daysLeft}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px;">Days Left</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:${scoreDelta >= 0 ? 'var(--personal)' : 'var(--p1)'};">${scoreDelta >= 0 ? '+' : ''}${scoreDelta}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px;">Score Δ</div>
+      </div>
+    </div>
+
+    <!-- LIFE SCORE TREND -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent3));"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);">Life Score Trend</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${weekCount} week${weekCount !== 1 ? 's' : ''} tracked</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:${latest.life_score >= 70 ? '#34d399' : latest.life_score >= 40 ? '#fbbf24' : '#ef4444'};">${latest.life_score}</div>
+          <div style="font-size:11px;color:var(--text2);">this week</div>
+        </div>
+      </div>
+      <svg width="100%" viewBox="0 0 ${sparkW} ${sparkH + 10}" style="overflow:visible;">
+        <defs>
+          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${snapshots.length > 1 ? `
+          <polygon points="${pts} ${sparkW},${sparkH} 0,${sparkH}" fill="url(#sparkGrad)"/>
+          <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ` : ''}
+        ${snapshots.map((s, i) => {
+          const x = snapshots.length === 1 ? sparkW/2 : (i / (snapshots.length - 1)) * sparkW;
+          const y = sparkH - (s.life_score / 100) * sparkH;
+          return `<circle cx="${x}" cy="${y}" r="4" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+                  <text x="${x}" y="${y - 8}" text-anchor="middle" fill="var(--text2)" font-size="9">${s.life_score}</text>`;
+        }).join('')}
+      </svg>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <span style="font-size:10px;color:var(--text2);">Wk 1</span>
+        <span style="font-size:10px;color:var(--text2);">Wk ${weekCount}</span>
+      </div>
+    </div>
+
+    <!-- CATEGORY TRENDS -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;">
+      <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:16px;">Category Progress</div>
+      ${lifeCategories.map(cat => {
+        const first_val = Math.min(first[cat.key] || 0, 100);
+        const latest_val = Math.min(latest[cat.key] || 0, 100);
+        const delta = latest_val - first_val;
+        return `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:13px;">${cat.icon}</span>
+              <span style="font-size:13px;font-weight:500;">${cat.name}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:11px;color:${delta > 0 ? 'var(--personal)' : delta < 0 ? 'var(--p1)' : 'var(--text2)'};">${delta > 0 ? '↑' : delta < 0 ? '↓' : '→'} ${Math.abs(delta)}%</span>
+              <span style="font-size:11px;color:var(--text2);">${latest_val}%</span>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;">
+            <div style="width:${latest_val}%;height:100%;background:${cat.color};border-radius:4px;transition:width 0.5s;"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- COMPLETION TREND -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;">
+      <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:14px;">Weekly Completion</div>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:60px;">
+        ${snapshots.map((s, i) => {
+          const h = Math.max(4, (s.completion_rate / 100) * 56);
+          const color = s.completion_rate >= 70 ? '#34d399' : s.completion_rate >= 40 ? '#fbbf24' : '#ef4444';
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <div style="font-size:9px;color:var(--text2);">${s.completion_rate}%</div>
+            <div style="width:100%;height:${h}px;background:${color};border-radius:3px 3px 0 0;min-height:4px;"></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;">
+        <span style="font-size:10px;color:var(--text2);">Week 1</span>
+        <span style="font-size:10px;color:var(--text2);">Week ${weekCount}</span>
+      </div>
+    </div>
+
+    <!-- SAVE THIS WEEK -->
+    <button onclick="saveWeeklySnapshot().then(()=>renderProgress())" style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Save This Week's Snapshot
+    </button>
+  `;
+}
+
 // ─── CHAT ─────────────────────────────────────────────────────
 let chatHistory = [];
 let chatOpen = false;
@@ -2075,7 +2377,7 @@ async function sendChat() {
 
   const today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', timeZone:'America/Chicago' });
 
-  const systemPrompt = `You are Steward, Vijay Ramdon's personal AI life manager. You know everything about his life and work.
+  const systemPrompt = `You are STWRD, Vijay Ramdon's personal AI life manager. You know everything about his life and work.
 
 TODAY: ${today}
 
@@ -2215,7 +2517,7 @@ function toggleMic() {
     <div style="display:flex;align-items:center;gap:10px;">
       <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:16px;">🧠</div>
       <div>
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">Steward</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">STWRD</div>
         <div style="font-size:11px;color:var(--personal);">● Online</div>
       </div>
     </div>
@@ -2225,7 +2527,7 @@ function toggleMic() {
   <!-- MESSAGES -->
   <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
     <div style="background:var(--surface2);border-radius:16px 16px 16px 4px;padding:14px;max-width:85%;font-size:14px;line-height:1.5;">
-      Hey Vijay! I'm Steward, your personal AI life manager. I have full context on all your tasks, projects, and priorities. What do you need?
+      Hey Vijay! I'm STWRD, your personal AI life manager. I have full context on all your tasks, projects, and priorities. What do you need?
     </div>
   </div>
 

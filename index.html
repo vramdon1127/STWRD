@@ -2698,9 +2698,9 @@ function renderObMetrics() {
       </div>
       ${m.active ? `
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-          <div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">What does ${m.name} look like in your life? <span style="opacity:0.6;">(optional)</span></div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Keywords that signal ${m.name} in your tasks <span style="opacity:0.6;">(optional)</span></div>
           <input type="text" 
-            placeholder="e.g. ${m.name === 'Faith' ? 'church, prayer, Bible study' : m.name === 'Health' ? 'gym, walks, therapy' : m.name === 'Family' ? 'date nights, kids activities' : m.name === 'Recharge' ? 'reading, movies, rest' : 'describe your ' + m.name.toLowerCase() + ' activities'}"
+            placeholder="e.g. ${m.name === 'Faith' ? 'church, prayer, pastor, devotion, Bible' : m.name === 'Health' ? 'gym, workout, run, doctor, therapy' : m.name === 'Family' ? 'Mia, kids, date night, school, home' : m.name === 'Recharge' ? 'movie, rest, vacation, game' : m.name === 'Finance' ? 'invoice, bill, budget, tax, payment' : m.name === 'Growth' ? 'course, book, learn, build, practice' : 'words that appear in your ' + m.name.toLowerCase() + ' tasks'}"
             value="${m.context || ''}"
             onclick="event.stopPropagation()"
             onchange="obMetrics[${i}].context=this.value"

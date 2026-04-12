@@ -686,7 +686,7 @@
       <div class="capture-label">New Task</div>
       <div class="who-row">
         <button class="who-btn active" onclick="setUser('Vijay', this)">Vijay</button>
-        <button class="who-btn" onclick="setUser('Wife', this)">Wife</button>
+        <button class="who-btn" onclick="setUser('Mia', this)">Mia</button>
       </div>
       <div class="capture-input-row">
         <textarea class="capture-input" id="taskInput" placeholder="Type or dictate a task..." rows="1"
@@ -706,26 +706,26 @@
       </button>
     </div>
 
-    <!-- FILTERS -->
-    <div class="filter-bar" id="filterBar">
-      <button class="filter-chip active" onclick="setFilter('all', this)">All</button>
-      <button class="filter-chip" onclick="setFilter('ai-complete', this)">🤖 AI Complete</button>
-      <button class="filter-chip" onclick="setFilter('ai-assist', this)">🤝 AI Assist</button>
-      <button class="filter-chip" onclick="setFilter('manual', this)">✋ Manual</button>
-      <button class="filter-chip" onclick="setFilter('GNE', this)">🎵 GNE</button>
-      <button class="filter-chip" onclick="setFilter('Caliber', this)">🔧 Caliber</button>
-      <button class="filter-chip" onclick="setFilter('Personal', this)">🏠 Personal</button>
-      <button class="filter-chip" onclick="setFilter('ServeAnts', this)">📊 ServeAnts</button>
-    </div>
+    <!-- PROJECT BUCKETS VIEW -->
+    <div id="projectBuckets"></div>
 
-    <div class="section-header">
-      <div class="section-title">
-        Tasks
-        <span class="count-badge" id="taskCount">0</span>
+    <!-- PROJECT DETAIL VIEW -->
+    <div id="projectDetail" style="display:none;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <button onclick="closeProject()" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;display:flex;align-items:center;gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;" id="projectDetailTitle"></div>
       </div>
+      <div class="filter-bar" id="projectFilterBar">
+        <button class="filter-chip active" onclick="setProjectFilter('all',this)">All</button>
+        <button class="filter-chip" onclick="setProjectFilter('AI Complete',this)">🤖 AI Complete</button>
+        <button class="filter-chip" onclick="setProjectFilter('AI Assist',this)">🤝 AI Assist</button>
+        <button class="filter-chip" onclick="setProjectFilter('Manual',this)">✋ Manual</button>
+      </div>
+      <div id="projectTaskList"></div>
     </div>
-
-    <div id="taskList"></div>
   </div>
 
   <!-- STATS VIEW -->
@@ -752,6 +752,20 @@
       <div class="settings-row" onclick="clearAll()">
         <div class="settings-label" style="color: var(--accent2);">Clear All Tasks</div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="var(--accent2)"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
+        <div class="settings-label" style="font-weight:600;margin-bottom:12px;">📚 Project Knowledge</div>
+        <div class="settings-value" style="margin-bottom:8px;">Update context Claude uses to process your tasks</div>
+        <select id="knowledgeSelect" onchange="loadKnowledgeEditor()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;margin-bottom:8px;">
+          <option value="GNE">🎵 GNE</option>
+          <option value="Caliber">🔧 Caliber</option>
+          <option value="Personal">🏠 Personal</option>
+          <option value="ServeAnts">📊 ServeAnts</option>
+        </select>
+        <textarea id="knowledgeEditor" rows="6" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;resize:vertical;margin-bottom:8px;" placeholder="Paste project context here..."></textarea>
+        <button onclick="saveKnowledge()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Save Knowledge</button>
       </div>
     </div>
     <div class="settings-section">
@@ -807,12 +821,24 @@ let isRecording = false;
 let currentAiTaskId = null;
 
 // ─── INIT ─────────────────────────────────────────────────────
+let knowledgeBase = {};
+
 window.addEventListener('load', () => {
   const saved = localStorage.getItem('apiKey');
   if (saved) document.getElementById('apiKeyInput').value = saved;
+  loadKnowledge();
   loadTasks();
   setupRealtime();
 });
+
+async function loadKnowledge() {
+  try {
+    const data = await sbFetch('knowledge?select=project,context');
+    if (data) {
+      data.forEach(row => { knowledgeBase[row.project] = row.context; });
+    }
+  } catch(e) { console.error('Knowledge load failed:', e); }
+}
 
 // ─── REALTIME POLLING ─────────────────────────────────────────
 function setupRealtime() {
@@ -825,6 +851,7 @@ function setupRealtime() {
       if (oldIds !== newIds) {
         tasks = newTasks;
         renderTasks();
+        if (currentProject) renderProjectTasks();
         renderStats();
         showToast('✨ Tasks updated');
       }
@@ -900,11 +927,28 @@ async function processTask() {
   document.getElementById('taskList').prepend(loadingEl);
 
   try {
+    const taskHistory = tasks.slice(0, 50).map(t => 
+      `[${t.project}][${t.category}][${t.priority}] ${t.cleaned_task || t.content}`
+    ).join('\n');
+
+    const gne = knowledgeBase['GNE'] || 'GNE is Vijay\'s DJ/MC business';
+    const cal = knowledgeBase['Caliber'] || 'Caliber is Director of Internal Controls role';
+    const pers = knowledgeBase['Personal'] || 'Personal life tasks';
+    const sa = knowledgeBase['ServeAnts'] || 'ServeAnts CPA LLC';
+
     const prompt = `You are a personal AI chief of staff for Vijay Ramdon. He runs multiple ventures:
-- GNE (Good News Entertainment): DJ/MC business, weddings, events, HoneyBook CRM, VIBO app, equipment, MC staffing
-- Caliber: Corporate role as Director of Internal Controls at auto body company, SOX compliance, PwC audits, Workiva, IPO prep
-- Personal: Personal life tasks, family, health, home
-- ServeAnts: CPA LLC, tax returns (ProConnect), nonprofit treasurer, AI financial advisor app
+
+GNE: ${gne}
+
+CALIBER: ${cal}
+
+PERSONAL: ${pers}
+
+SERVEANTS: ${sa}
+
+RECENT TASK HISTORY (use these patterns to categorize accurately):
+${taskHistory || 'No previous tasks yet'}`;
+${taskHistory || 'No previous tasks yet'}`;
 
 Given this raw task, respond ONLY in this exact format with no extra text:
 TASK: [cleaned, concise, actionable version of the task]
@@ -983,7 +1027,10 @@ async function runAiTask(taskId) {
   document.getElementById('aiModal').style.display = 'flex';
 
   try {
-    const aiPrompt = `You are Vijay Ramdon's AI chief of staff. Complete this task fully and present the result clearly:\n\n${task.cleaned_task || task.content}\n\nContext: This is a ${task.project} task.`;
+    const gneContext = `GNE CONTEXT: Luxury DJ/MC company in Dallas TX. Vijay's voice is warm, faith-aligned, personal. Key phrases: "We would be absolutely HONORED", "Can't wait to make it an amazing night!". Packages: Elegant ($2,600-$3,200), Signature ($3,600-$4,400), Luxurious ($5,000-$6,200). Tools: HoneyBook, VIBO. MCs: Caleb, Jono. Always write in first person as Vijay. End with a clear next step. Scheduling link: https://bit.ly/GNEVideoCall`;
+    const caliberContext = `CALIBER CONTEXT: Vijay is Director of Internal Controls at Caliber Collision. SOX compliance with PwC as external auditor and Protiviti as co-sourced IA. Key systems: Workday, CCC ONE, FastPath, Workiva, CertiTrack. Active projects: UAR/SOD cycles, AP narrative, account reconciliation tool, DOA rollout. Key contacts: Grant Willard, Craig James, Amit Patel, Jessica Knabe, Yvette Dubey. Communication style: professional, concise, no filler. Go straight to the revision. Peer-level tone with auditors. Write in first person as Vijay.`;
+    const projectContext = task.project === 'GNE' ? gneContext : task.project === 'Caliber' ? caliberContext : '';
+    const aiPrompt = `You are Vijay Ramdon's AI chief of staff. Complete this task fully and present the result clearly. ${projectContext}\n\nTask: ${task.cleaned_task || task.content}\n\nProvide the complete deliverable ready to use — draft the email, write the script, create the timeline, etc. Don't explain what you're doing, just do it.`;
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1023,6 +1070,7 @@ async function toggleDone(taskId) {
     task.status = newStatus;
   }
   renderTasks();
+  if (currentProject) renderProjectTasks();
   renderStats();
 }
 
@@ -1030,41 +1078,108 @@ async function removeTask(taskId) {
   await deleteTask(taskId);
   tasks = tasks.filter(t => t.id !== taskId);
   renderTasks();
+  if (currentProject) renderProjectTasks();
   renderStats();
   showToast('Task deleted');
 }
 
 // ─── RENDER ───────────────────────────────────────────────────
-function renderTasks() {
-  const list = document.getElementById('taskList');
-  const filtered = tasks.filter(t => {
-    if (currentFilter === 'all') return true;
-    if (currentFilter === 'ai-complete') return t.category === 'AI Complete';
-    if (currentFilter === 'ai-assist') return t.category === 'AI Assist';
-    if (currentFilter === 'manual') return t.category === 'Manual';
-    return t.project === currentFilter;
-  });
+const PROJECTS = [
+  { name: 'GNE', icon: '🎵', color: 'var(--gne)' },
+  { name: 'Caliber', icon: '🔧', color: 'var(--caliber)' },
+  { name: 'Personal', icon: '🏠', color: 'var(--personal)' },
+  { name: 'ServeAnts', icon: '📊', color: 'var(--servents)' },
+];
 
-  document.getElementById('taskCount').textContent = filtered.length;
+let currentProject = null;
+let currentProjectFilter = 'all';
+
+function renderTasks() {
+  renderBuckets();
+}
+
+function renderBuckets() {
+  const el = document.getElementById('projectBuckets');
+  if (!el) return;
+  el.innerHTML = PROJECTS.map(p => {
+    const count = tasks.filter(t => t.project === p.name).length;
+    const p1count = tasks.filter(t => t.project === p.name && t.priority === 'P1').length;
+    return `
+    <div onclick="openProject('${p.name}')" style="
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:20px;
+      margin-bottom:12px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      transition:all 0.2s;
+      position:relative;
+      overflow:hidden;
+    " onmouseover="this.style.borderColor='${p.color}'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:${p.color};border-radius:2px 0 0 2px;"></div>
+      <div style="display:flex;align-items:center;gap:14px;padding-left:8px;">
+        <div style="font-size:28px;">${p.icon}</div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">${p.name}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px;">${count} task${count !== 1 ? 's' : ''}${p1count > 0 ? ` · <span style="color:var(--p1)">${p1count} urgent</span>` : ''}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="background:${p.color}22;color:${p.color};border-radius:12px;padding:4px 12px;font-family:'Syne',sans-serif;font-weight:700;font-size:18px;">${count}</div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openProject(name) {
+  currentProject = name;
+  currentProjectFilter = 'all';
+  const proj = PROJECTS.find(p => p.name === name);
+  document.getElementById('projectBuckets').style.display = 'none';
+  document.getElementById('projectDetail').style.display = 'block';
+  document.getElementById('projectDetailTitle').innerHTML = `${proj.icon} ${proj.name}`;
+  renderProjectTasks();
+}
+
+function closeProject() {
+  currentProject = null;
+  document.getElementById('projectDetail').style.display = 'none';
+  document.getElementById('projectBuckets').style.display = 'block';
+  renderBuckets();
+}
+
+function setProjectFilter(filter, btn) {
+  currentProjectFilter = filter;
+  document.querySelectorAll('#projectFilterBar .filter-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderProjectTasks();
+}
+
+function renderProjectTasks() {
+  const list = document.getElementById('projectTaskList');
+  let filtered = tasks.filter(t => t.project === currentProject);
+  if (currentProjectFilter !== 'all') filtered = filtered.filter(t => t.category === currentProjectFilter);
 
   if (filtered.length === 0) {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">✨</div>
         <div class="empty-state-title">No tasks here</div>
-        <div class="empty-state-sub">Dictate or type a task above to get started</div>
+        <div class="empty-state-sub">Add a task above to get started</div>
       </div>`;
     return;
   }
 
   list.innerHTML = filtered.map(task => {
-    const projClass = `tag-project-${(task.project || '').toLowerCase().replace(/\s/g,'')}`;
     const catClass = `tag-cat-${(task.category || '').toLowerCase().replace(/ /g,'-')}`;
     const priClass = `tag-${(task.priority || 'p3').toLowerCase()}`;
     const isAiComplete = task.category === 'AI Complete';
-
     return `
-    <div class="task-card ${task.status === 'done' ? 'done' : ''}" id="task-${task.id}">
+    <div class="task-card" id="task-${task.id}">
       <div class="task-card-top">
         <div class="task-check ${task.status === 'done' ? 'checked' : ''}" onclick="toggleDone('${task.id}')">
           ${task.status === 'done' ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
@@ -1072,7 +1187,6 @@ function renderTasks() {
         <div class="task-body">
           <div class="task-title">${task.cleaned_task || task.content}</div>
           <div class="task-meta">
-            ${task.project ? `<span class="tag ${projClass}">${task.project}</span>` : ''}
             ${task.category ? `<span class="tag ${catClass}">${task.category}</span>` : ''}
             ${task.priority ? `<span class="tag ${priClass}">${task.priority}</span>` : ''}
             ${task.added_by ? `<span class="tag tag-added-by">${task.added_by}</span>` : ''}
@@ -1140,6 +1254,7 @@ function showView(name) {
   document.getElementById(`view-${name}`).classList.add('active');
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'stats') renderStats();
+  if (name === 'settings') loadKnowledgeEditor();
 }
 
 function setFilter(filter, btn) {
@@ -1157,7 +1272,7 @@ function setUser(name, btn) {
 }
 
 function switchUser() {
-  const users = ['Vijay', 'Wife'];
+  const users = ['Vijay', 'Mia'];
   const next = users[(users.indexOf(currentUser) + 1) % users.length];
   currentUser = next;
   document.getElementById('currentUser').textContent = next;
@@ -1175,6 +1290,24 @@ function handleKey(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     processTask();
+  }
+}
+
+function loadKnowledgeEditor() {
+  const project = document.getElementById('knowledgeSelect').value;
+  document.getElementById('knowledgeEditor').value = knowledgeBase[project] || '';
+}
+
+async function saveKnowledge() {
+  const project = document.getElementById('knowledgeSelect').value;
+  const context = document.getElementById('knowledgeEditor').value.trim();
+  if (!context) return;
+  try {
+    await sbFetch(`knowledge?project=eq.${project}`, 'PATCH', { context, updated_at: new Date().toISOString() });
+    knowledgeBase[project] = context;
+    showToast(`✓ ${project} knowledge updated`);
+  } catch(e) {
+    showToast('❌ Save failed: ' + e.message);
   }
 }
 

@@ -741,7 +741,11 @@
     <!-- Step 2: Hats -->
     <div id="ob-step-2" style="display:none;">
       <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Your Hats 🎩</div>
-      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:24px;">What hats do you wear? Add as many as you need.</div>
+      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:8px;">What roles do you carry in life?</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:20px;">
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">Think about your <strong style="color:var(--text);">jobs</strong>, <strong style="color:var(--text);">businesses</strong>, <strong style="color:var(--text);">family roles</strong>, <strong style="color:var(--text);">side projects</strong>, <strong style="color:var(--text);">ministries</strong> — anything you're responsible for. These become the buckets your tasks live in.</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;opacity:0.7;">Examples: DJ Business · Corporate Job · Dad · ServeAnts · App Development</div>
+      </div>
       <div id="ob-hats-list" style="margin-bottom:16px;"></div>
       <button onclick="addObHat()" style="width:100%;padding:14px;border-radius:12px;border:2px dashed var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;margin-bottom:32px;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">+ Add Hat</button>
       <div style="display:flex;gap:10px;">
@@ -753,7 +757,11 @@
     <!-- Step 3: Life Metrics -->
     <div id="ob-step-3" style="display:none;">
       <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Life Balance ⚖️</div>
-      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:24px;">Choose the areas that matter to you and set your weekly goals.</div>
+      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:8px;">How do you measure a well-lived life?</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:20px;">
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;">These are <strong style="color:var(--text);">dimensions of life</strong>, not hats. STWRD tracks how your tasks distribute across these areas each week — and scores your balance. Your hats feed into these categories automatically.</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:8px;opacity:0.7;">e.g. A GNE invoice → Work + Finance · Church task → Faith · Gym → Health</div>
+      </div>
       <div id="ob-metrics-list" style="margin-bottom:32px;"></div>
       <div style="display:flex;gap:10px;">
         <button onclick="obBack(3)" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
@@ -2596,12 +2604,8 @@ async function renderProgress() {
 
 // ─── ONBOARDING ────────────────────────────────────────────────
 const OB_DEFAULT_HATS = [
-  { name: 'Work', icon: '💼', color: '#60a5fa' },
-  { name: 'Family', icon: '🏠', color: '#34d399' },
-  { name: 'Health', icon: '💪', color: '#fb923c' },
   { name: 'Personal', icon: '✨', color: '#a78bfa' },
-  { name: 'Faith', icon: '🙏', color: '#8b5cf6' },
-  { name: 'Finance', icon: '💰', color: '#fbbf24' },
+  { name: 'Family', icon: '🏠', color: '#34d399' },
 ];
 
 const OB_DEFAULT_METRICS = [

@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="STWRD">
 <title>STWRD</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -665,6 +666,18 @@
   }
   .save-btn:hover { opacity: 0.9; }
 
+
+  /* ONBOARDING */
+  .ob-step {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .ob-step.active { background: var(--accent); }
+  .ob-step.done { background: var(--accent3); }
+
   /* VIEWS */
   .view { display: none; }
   .view.active { display: block; }
@@ -683,23 +696,113 @@
 </head>
 <body>
 
-<header>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:400px;text-align:center;">
+    <div style="font-family:'Syne',sans-serif;font-size:42px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;">STWRD</div>
+    <div style="color:var(--text2);font-size:15px;margin-bottom:48px;">Steward what matters most</div>
+    <button onclick="signInWithGoogle()" style="width:100%;padding:16px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:12px;transition:all 0.2s;margin-bottom:16px;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continue with Google
+    </button>
+    <div style="font-size:12px;color:var(--text2);line-height:1.6;">By continuing you agree to our Terms of Service.<br>Your data is private and secure.</div>
+  </div>
+</div>
+
+<!-- ONBOARDING SCREEN -->
+<div id="onboardingScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;overflow-y:auto;">
+  <div style="max-width:500px;margin:0 auto;padding:40px 24px 100px;">
+    
+    <!-- Step indicator -->
+    <div style="display:flex;gap:6px;margin-bottom:40px;" id="onboardingSteps">
+      <div class="ob-step active" id="step-dot-1"></div>
+      <div class="ob-step" id="step-dot-2"></div>
+      <div class="ob-step" id="step-dot-3"></div>
+      <div class="ob-step" id="step-dot-4"></div>
+    </div>
+
+    <!-- Step 1: Welcome -->
+    <div id="ob-step-1">
+      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Welcome to STWRD 👋</div>
+      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:32px;">Let's set up your personal life management system. Takes about 2 minutes.</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Your name</div>
+        <input id="ob-name" type="text" placeholder="First name" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;">
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:32px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Anthropic API Key</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Powers your AI task processing and advisor. Get one free at console.anthropic.com</div>
+        <input id="ob-apikey" type="password" placeholder="sk-ant-..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;">
+      </div>
+      <button onclick="obNext(1)" style="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Continue →</button>
+    </div>
+
+    <!-- Step 2: Projects -->
+    <div id="ob-step-2" style="display:none;">
+      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Your Projects 📁</div>
+      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:24px;">What areas of your life do you want to steward? Add as many as you need.</div>
+      <div id="ob-projects-list" style="margin-bottom:16px;"></div>
+      <button onclick="addObProject()" style="width:100%;padding:14px;border-radius:12px;border:2px dashed var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;margin-bottom:32px;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">+ Add Project</button>
+      <div style="display:flex;gap:10px;">
+        <button onclick="obBack(2)" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
+        <button onclick="obNext(2)" style="flex:2;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Life Metrics -->
+    <div id="ob-step-3" style="display:none;">
+      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Life Balance ⚖️</div>
+      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:24px;">Choose the areas that matter to you and set your weekly goals.</div>
+      <div id="ob-metrics-list" style="margin-bottom:32px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="obBack(3)" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
+        <button onclick="obNext(3)" style="flex:2;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Digest Email -->
+    <div id="ob-step-4" style="display:none;">
+      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Daily Digest 📬</div>
+      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:24px;">Get a personalized email every morning with your Life Score, today's tasks, and one AI focus recommendation.</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Your email (for digest)</div>
+        <input id="ob-email" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;">
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:32px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Resend API Key <span style="color:var(--text2);font-weight:400;">(optional)</span></div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Free at resend.com — skip this for now if needed</div>
+        <input id="ob-resend" type="password" placeholder="re_..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="obBack(4)" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
+        <button onclick="completeOnboarding()" style="flex:2;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Let's go 🚀</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<header style="display:none;">
   <div class="logo" onclick="showView('capture')" style="cursor:pointer;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>STWRD</div>
-  <div class="user-badge" onclick="switchUser()">
+  <div class="user-badge" onclick="toggleUserMenu()" style="position:relative;">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-    <span id="currentUser">Vijay</span>
+    <span id="currentUser">Me</span>
+  </div>
+  <div id="userMenu" style="display:none;position:absolute;top:60px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:200;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <button onclick="showView('settings');toggleUserMenu()" style="width:100%;padding:10px 12px;background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;text-align:left;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">⚙️ Settings</button>
+    <button onclick="signOut()" style="width:100%;padding:10px 12px;background:none;border:none;color:var(--accent2);font-family:'DM Sans',sans-serif;font-size:14px;text-align:left;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">← Sign Out</button>
   </div>
 </header>
 
-<main>
+<main style="display:none;">
   <!-- CAPTURE VIEW -->
   <div class="view active" id="view-capture">
     <div class="capture-card">
       <div class="capture-label">New Task</div>
-      <div class="who-row">
-        <button class="who-btn active" onclick="setUser('Vijay', this)">Vijay</button>
-        <button class="who-btn" onclick="setUser('Mia', this)">Mia</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:13px;color:var(--text2);">Adding as <span id="taskAddingAs" style="color:var(--text);font-weight:500;">me</span></div>
       </div>
       <div class="capture-input-row">
         <textarea class="capture-input" id="taskInput" placeholder="Type or dictate a task..." rows="1"
@@ -826,14 +929,14 @@
     <div class="settings-section">
       <div class="settings-row" style="cursor: default; flex-direction: column; align-items: flex-start;">
         <div class="settings-label" style="font-weight: 600;">About</div>
-        <div class="settings-value" style="margin-top: 4px;">STWRD v1.0 · Built for Vijay & Family</div>
+        <div class="settings-value" style="margin-top: 4px;">STWRD v2.0 · Your personal life management system</div>
       </div>
     </div>
   </div>
 </main>
 
 <!-- NAV BAR -->
-<nav class="nav-bar">
+<nav class="nav-bar" style="display:none;">
   <button class="nav-item active" id="nav-capture" onclick="showView('capture')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     Capture
@@ -923,10 +1026,17 @@
 const SUPABASE_URL = 'https://fnnegalrrdzcgoelljmi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZubmVnYWxycmR6Y2dvZWxsam1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDMwNjksImV4cCI6MjA5MTUxOTA2OX0.bhgk6czCQYTuUGnu5Zv7pml9uMuPrp4I1VBSzVIHwqw';
 
+// ─── SUPABASE AUTH CLIENT ─────────────────────────────────────
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // ─── STATE ────────────────────────────────────────────────────
 let tasks = [];
 let currentFilter = 'all';
-let currentUser = 'Vijay';
+let currentUser = 'Me';
+let currentUserId = null;
+let currentUserProfile = null;
+let userProjects = [];
+let userLifeCategories = [];
 let recognition = null;
 let isRecording = false;
 let currentAiTaskId = null;
@@ -935,19 +1045,142 @@ let currentAiTaskId = null;
 let knowledgeBase = {};
 let corrections = [];
 
-window.addEventListener('load', () => {
-  const saved = localStorage.getItem('apiKey');
-  if (saved) document.getElementById('apiKeyInput').value = saved;
-  loadKnowledge();
-  loadCorrections();
-  loadTasks();
-  setTimeout(saveWeeklySnapshot, 5000); // auto-save snapshot after tasks load
-  setupRealtime();
+window.addEventListener('load', async () => {
+  // Check auth state
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    showAuthScreen();
+    return;
+  }
+
+  // Auth callback handling (after Google redirect)
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const { data: { session: newSession } } = await supabase.auth.getSession();
+    if (newSession) {
+      window.location.hash = '';
+      await initApp(newSession.user);
+      return;
+    }
+  }
+
+  await initApp(session.user);
 });
+
+// Handle auth state changes
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    window.location.hash = '';
+    await initApp(session.user);
+  } else if (event === 'SIGNED_OUT') {
+    showAuthScreen();
+  }
+});
+
+async function initApp(user) {
+  currentUserId = user.id;
+  currentUser = user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'Me';
+  
+  // Update user display
+  const userEl = document.getElementById('currentUser');
+  if (userEl) userEl.textContent = currentUser;
+
+  // Load profile
+  currentUserProfile = await loadProfile(user);
+  
+  // Check if onboarding needed
+  if (!currentUserProfile?.onboarding_complete) {
+    showOnboarding(user);
+    return;
+  }
+
+  // Load user data and show app
+  hideAuthScreens();
+  await loadUserProjects();
+  await loadUserLifeCategories();
+  await loadKnowledge();
+  await loadCorrections();
+  await loadTasks();
+  setTimeout(saveWeeklySnapshot, 5000);
+  setupRealtime();
+  
+  // Load settings
+  const apiKey = currentUserProfile?.anthropic_key;
+  if (apiKey) localStorage.setItem('apiKey', apiKey);
+  const apiKeyEl = document.getElementById('apiKeyInput');
+  if (apiKeyEl && apiKey) apiKeyEl.value = apiKey;
+}
+
+async function loadProfile(user) {
+  try {
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    return data;
+  } catch(e) {
+    // Create profile if doesn't exist
+    const { data } = await supabase.from('profiles').insert({
+      id: user.id,
+      full_name: user.user_metadata?.full_name,
+      avatar_url: user.user_metadata?.avatar_url,
+    }).select().single();
+    return data;
+  }
+}
+
+// ─── AUTH FUNCTIONS ────────────────────────────────────────────
+function showAuthScreen() {
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('onboardingScreen').style.display = 'none';
+  document.querySelector('header').style.display = 'none';
+  document.querySelector('main').style.display = 'none';
+  document.querySelector('.nav-bar').style.display = 'none';
+  document.getElementById('chatBtn').style.display = 'none';
+}
+
+function hideAuthScreens() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('onboardingScreen').style.display = 'none';
+  document.querySelector('header').style.display = 'flex';
+  document.querySelector('main').style.display = 'block';
+  document.querySelector('.nav-bar').style.display = 'flex';
+  document.getElementById('chatBtn').style.display = 'flex';
+}
+
+async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin
+    }
+  });
+  if (error) showToast('❌ Sign in failed: ' + error.message);
+}
+
+function toggleUserMenu() {
+  const menu = document.getElementById('userMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closeMenu(e) {
+      if (!e.target.closest('.user-badge') && !e.target.closest('#userMenu')) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', closeMenu);
+      }
+    });
+  }, 0);
+}
+
+async function signOut() {
+  await supabase.auth.signOut();
+  localStorage.removeItem('apiKey');
+  localStorage.removeItem('advisorCache');
+  localStorage.removeItem('advisorFingerprint');
+  showAuthScreen();
+}
 
 async function loadKnowledge() {
   try {
-    const data = await sbFetch('knowledge?select=project,context');
+    const data = await sbFetch(`knowledge?user_id=eq.${currentUserId}&select=project,context`);
     if (data) {
       data.forEach(row => { knowledgeBase[row.project] = row.context; });
     }
@@ -956,7 +1189,7 @@ async function loadKnowledge() {
 
 async function loadCorrections() {
   try {
-    const data = await sbFetch('corrections?order=created_at.desc&limit=30');
+    const data = await sbFetch(`corrections?user_id=eq.${currentUserId}&order=created_at.desc&limit=30`);
     corrections = data || [];
   } catch(e) { console.error('Corrections load failed:', e); }
 }
@@ -965,7 +1198,7 @@ async function loadCorrections() {
 function setupRealtime() {
   setInterval(async () => {
     try {
-      const data = await sbFetch('tasks?order=created_at.desc&status=neq.done&limit=100');
+      const data = await sbFetch(`tasks?user_id=eq.${currentUserId}&order=created_at.desc&status=neq.done&limit=100`);
       const newTasks = data || [];
       const oldIds = JSON.stringify(tasks.map(t => t.id + t.status));
       const newIds = JSON.stringify(newTasks.map(t => t.id + t.status));
@@ -983,11 +1216,15 @@ function setupRealtime() {
 
 // ─── SUPABASE HELPERS ─────────────────────────────────────────
 async function sbFetch(path, method = 'GET', body = null) {
+  // Get current session token for RLS
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || SUPABASE_KEY;
+  
   const opts = {
     method,
     headers: {
       'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Prefer': method === 'POST' ? 'return=representation' : ''
     }
@@ -999,9 +1236,40 @@ async function sbFetch(path, method = 'GET', body = null) {
   return text ? JSON.parse(text) : null;
 }
 
+// ─── USER PROJECTS ─────────────────────────────────────────────
+const DEFAULT_PROJECTS = [
+  { name: 'Work', icon: '💼', color: '#60a5fa' },
+  { name: 'Family', icon: '🏠', color: '#34d399' },
+  { name: 'Health', icon: '💪', color: '#fb923c' },
+  { name: 'Personal', icon: '✨', color: '#a78bfa' },
+];
+
+async function loadUserProjects() {
+  try {
+    const data = await sbFetch(`projects?user_id=eq.${currentUserId}&order=sort_order.asc`);
+    if (data && data.length > 0) {
+      userProjects = data;
+    } else {
+      userProjects = PROJECTS.map(p => ({ name: p.name, icon: p.icon, color: p.color }));
+    }
+    renderBuckets();
+  } catch(e) {
+    userProjects = PROJECTS.map(p => ({ name: p.name, icon: p.icon, color: p.color }));
+  }
+}
+
+async function loadUserLifeCategories() {
+  try {
+    const data = await sbFetch(`life_categories?user_id=eq.${currentUserId}&active=eq.true&order=sort_order.asc`);
+    if (data && data.length > 0) {
+      userLifeCategories = data;
+    }
+  } catch(e) { console.error('Life categories load failed:', e); }
+}
+
 async function loadTasks() {
   try {
-    const data = await sbFetch('tasks?order=created_at.desc&status=neq.done&limit=100');
+    const data = await sbFetch(`tasks?user_id=eq.${currentUserId}&order=created_at.desc&status=neq.done&limit=100`);
     tasks = data || [];
     renderTasks();
     renderStats();
@@ -1012,7 +1280,7 @@ async function loadTasks() {
 }
 
 async function saveTask(task) {
-  return await sbFetch('tasks', 'POST', task);
+  return await sbFetch('tasks', 'POST', { ...task, user_id: currentUserId });
 }
 
 async function updateTask(id, updates) {
@@ -1054,37 +1322,35 @@ async function processTask() {
       `[${t.project}][${t.category}][${t.priority}] ${t.cleaned_task || t.content}`
     ).join('\n');
 
-    const gne = knowledgeBase['GNE'] || 'GNE is Vijay\'s DJ/MC business';
-    const cal = knowledgeBase['Caliber'] || 'Caliber is Director of Internal Controls role';
-    const pers = knowledgeBase['Personal'] || 'Personal life tasks';
-    const sa = knowledgeBase['ServeAnts'] || 'ServeAnts CPA LLC';
+    // Build dynamic project knowledge context
+    const projectContext = userProjects.map(p => {
+      const kb = knowledgeBase[p.name] || '';
+      return `${p.name.toUpperCase()}: ${kb || p.name + ' tasks'}`;
+    }).join('\n\n');
 
-    const prompt = `You are STWRD, a personal AI life manager for Vijay Ramdon. He runs multiple ventures:
+    const projectNames = userProjects.map(p => p.name).join(' OR ');
 
-GNE: ${gne}
+    const prompt = `You are STWRD, a personal AI life manager. You help ${currentUser} manage their life and work.
 
-CALIBER: ${cal}
-
-PERSONAL: ${pers}
-
-SERVEANTS: ${sa}
+PROJECTS:
+${projectContext}
 
 RECENT TASK HISTORY (use these patterns to categorize accurately):
 ${taskHistory || 'No previous tasks yet'}
 
-CORRECTIONS (Vijay manually fixed these — learn from them and never repeat these mistakes):
+CORRECTIONS (user manually fixed these — learn from them and never repeat these mistakes):
 ${corrections.length > 0 ? corrections.map(c => `"${c.original_task}" was moved from ${c.original_project}/${c.original_category} → ${c.corrected_project}/${c.corrected_category}`).join('\n') : 'No corrections yet'}
 
 Given this raw task, respond ONLY in this exact format with no extra text:
 TASK: [cleaned, concise, actionable version of the task]
 CATEGORY: [AI Complete OR AI Assist OR Manual]
-PROJECT: [GNE OR Caliber OR Personal OR ServeAnts]
+PROJECT: [${projectNames}]
 PRIORITY: [P1 OR P2 OR P3 OR P4]
 DUE: [YYYY-MM-DD if a date is mentioned, otherwise none]
 REASON: [one short sentence why]
 
 Priority guide: P1=urgent/today, P2=important/this week, P3=normal, P4=low/someday
-Category guide: AI Complete=AI can fully do it without Vijay, AI Assist=needs Vijay's input, Manual=must be done by Vijay alone
+Category guide: AI Complete=AI can fully do it without Vijay, AI Assist=needs user's input, Manual=must be done by user alone
 Due date guide: Extract any date mentioned. Today is ${new Date().toLocaleDateString('en-CA', {timeZone: 'America/Chicago'})}.
 - "today" or "tonight" or "this evening" = today's date
 - "tomorrow" = tomorrow's date
@@ -1714,22 +1980,9 @@ function setFilter(filter, btn) {
   renderTasks();
 }
 
-function setUser(name, btn) {
-  currentUser = name;
-  document.getElementById('currentUser').textContent = name;
-  document.querySelectorAll('.who-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-}
+// setUser removed — now using Google Auth
 
-function switchUser() {
-  const users = ['Vijay', 'Mia'];
-  const next = users[(users.indexOf(currentUser) + 1) % users.length];
-  currentUser = next;
-  document.getElementById('currentUser').textContent = next;
-  document.querySelectorAll('.who-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent === next);
-  });
-}
+// switchUser removed — now using Google Auth
 
 function autoResize(el) {
   el.style.height = 'auto';
@@ -1797,6 +2050,7 @@ async function saveEdit() {
     // Log correction to help Claude learn
     try {
       await sbFetch('corrections', 'POST', {
+        user_id: currentUserId,
         original_task: task.cleaned_task || task.content,
         original_project: task.project,
         original_category: task.category,
@@ -2005,7 +2259,13 @@ async function saveKnowledge() {
   const context = document.getElementById('knowledgeEditor').value.trim();
   if (!context) return;
   try {
-    await sbFetch(`knowledge?project=eq.${project}`, 'PATCH', { context, updated_at: new Date().toISOString() });
+    // Try patch first, then insert
+    const existing = await sbFetch(`knowledge?user_id=eq.${currentUserId}&project=eq.${project}&select=id`);
+    if (existing && existing.length > 0) {
+      await sbFetch(`knowledge?user_id=eq.${currentUserId}&project=eq.${project}`, 'PATCH', { context, updated_at: new Date().toISOString() });
+    } else {
+      await sbFetch('knowledge', 'POST', { user_id: currentUserId, project, context });
+    }
     knowledgeBase[project] = context;
     showToast(`✓ ${project} knowledge updated`);
   } catch(e) {
@@ -2013,22 +2273,25 @@ async function saveKnowledge() {
   }
 }
 
-function saveApiKey() {
+async function saveApiKey() {
   const key = document.getElementById('apiKeyInput').value.trim();
   if (!key) return;
   localStorage.setItem('apiKey', key);
+  try {
+    await supabase.from('profiles').upsert({ id: currentUserId, anthropic_key: key });
+  } catch(e) {}
   showToast('✓ API key saved');
 }
 
 async function clearDone() {
-  await sbFetch('tasks?status=eq.done', 'DELETE');
+  await sbFetch(`tasks?user_id=eq.${currentUserId}&status=eq.done`, 'DELETE');
   await loadTasks();
   showToast('Completed tasks cleared');
 }
 
 async function clearAll() {
   if (!confirm('Delete ALL tasks? This cannot be undone.')) return;
-  await sbFetch('tasks', 'DELETE');
+  await sbFetch(`tasks?user_id=eq.${currentUserId}`, 'DELETE');
   tasks = [];
   renderTasks();
   renderStats();
@@ -2053,7 +2316,7 @@ async function saveWeeklySnapshot() {
     const weekStart = getWeekStart();
 
     // Check if we already saved this week
-    const existing = await sbFetch(`snapshots?week_start=eq.${weekStart}&limit=1`);
+    const existing = await sbFetch(`snapshots?user_id=eq.${currentUserId}&week_start=eq.${weekStart}&limit=1`);
     if (existing && existing.length > 0) return; // already saved this week
 
     const active = tasks;
@@ -2110,6 +2373,7 @@ async function saveWeeklySnapshot() {
     const lifeScore = Math.min(100, Math.round(baseAvg + overflowCredit));
 
     await sbFetch('snapshots', 'POST', {
+      user_id: currentUserId,
       week_start: weekStart,
       snapshot_date: today,
       life_score: lifeScore,
@@ -2151,7 +2415,7 @@ async function renderProgress() {
 
   let snapshots = [];
   try {
-    snapshots = await sbFetch('snapshots?order=week_start.asc&limit=12') || [];
+    snapshots = await sbFetch(`snapshots?user_id=eq.${currentUserId}&order=week_start.asc&limit=12`) || [];
   } catch(e) {
     el.innerHTML = `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;text-align:center;">
@@ -2329,6 +2593,191 @@ async function renderProgress() {
   `;
 }
 
+
+// ─── ONBOARDING ────────────────────────────────────────────────
+const OB_DEFAULT_PROJECTS = [
+  { name: 'Work', icon: '💼', color: '#60a5fa' },
+  { name: 'Family', icon: '🏠', color: '#34d399' },
+  { name: 'Health', icon: '💪', color: '#fb923c' },
+  { name: 'Personal', icon: '✨', color: '#a78bfa' },
+  { name: 'Faith', icon: '🙏', color: '#8b5cf6' },
+  { name: 'Finance', icon: '💰', color: '#fbbf24' },
+];
+
+const OB_DEFAULT_METRICS = [
+  { name: 'Work', icon: '💼', color: '#60a5fa', goal: 5, keywords: ['meeting','email','client','invoice','audit','booking'], active: true },
+  { name: 'Family', icon: '🏠', color: '#34d399', goal: 2, keywords: ['family','home','kids','spouse','partner','baby'], active: true },
+  { name: 'Health', icon: '💪', color: '#fb923c', goal: 3, keywords: ['workout','gym','exercise','run','walk','doctor','health'], active: true },
+  { name: 'Faith', icon: '🙏', color: '#a78bfa', goal: 1, keywords: ['church','pray','devotion','bible','worship','faith','spiritual'], active: true },
+  { name: 'Finance', icon: '💰', color: '#fbbf24', goal: 2, keywords: ['invoice','payment','bill','budget','tax','money'], active: true },
+  { name: 'Growth', icon: '🌱', color: '#38bdf8', goal: 1, keywords: ['learn','read','course','study','research','build','skill'], active: true },
+  { name: 'Recharge', icon: '🎮', color: '#6b7280', goal: 1, keywords: ['rest','relax','movie','game','vacation','break'], active: false },
+];
+
+let obProjects = [...OB_DEFAULT_PROJECTS];
+let obMetrics = [...OB_DEFAULT_METRICS];
+
+function showOnboarding(user) {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('onboardingScreen').style.display = 'block';
+  document.querySelector('header').style.display = 'none';
+  document.querySelector('main').style.display = 'none';
+  document.querySelector('.nav-bar').style.display = 'none';
+  document.getElementById('chatBtn').style.display = 'none';
+  
+  // Pre-fill name from Google
+  const name = user.user_metadata?.full_name?.split(' ')[0] || '';
+  const nameEl = document.getElementById('ob-name');
+  if (nameEl) nameEl.value = name;
+  
+  // Pre-fill email
+  const emailEl = document.getElementById('ob-email');
+  if (emailEl) emailEl.value = user.email || '';
+  
+  renderObProjects();
+  renderObMetrics();
+}
+
+function renderObProjects() {
+  const el = document.getElementById('ob-projects-list');
+  if (!el) return;
+  el.innerHTML = obProjects.map((p, i) => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:20px;">${p.icon}</span>
+      <input value="${p.name}" onchange="obProjects[${i}].name=this.value" style="flex:1;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;">
+      <div style="width:16px;height:16px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
+      <button onclick="removeObProject(${i})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:0;">×</button>
+    </div>`).join('');
+}
+
+function addObProject() {
+  const colors = ['#f472b6','#60a5fa','#34d399','#fb923c','#a78bfa','#fbbf24','#38bdf8'];
+  const icons = ['📁','🎯','🚀','⚡','🌟','💡','🔥'];
+  obProjects.push({ 
+    name: 'New Project', 
+    icon: icons[obProjects.length % icons.length], 
+    color: colors[obProjects.length % colors.length] 
+  });
+  renderObProjects();
+}
+
+function removeObProject(i) {
+  if (obProjects.length <= 1) return;
+  obProjects.splice(i, 1);
+  renderObProjects();
+}
+
+function renderObMetrics() {
+  const el = document.getElementById('ob-metrics-list');
+  if (!el) return;
+  el.innerHTML = obMetrics.map((m, i) => `
+    <div style="background:var(--surface);border:1px solid ${m.active ? m.color + '40' : 'var(--border)'};border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all 0.2s;" onclick="toggleMetric(${i})">
+      <span style="font-size:18px;">${m.icon}</span>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:500;color:${m.active ? 'var(--text)' : 'var(--text2)'};">${m.name}</div>
+        ${m.active ? `<div style="font-size:12px;color:var(--text2);">Goal: ${m.goal} task${m.goal !== 1 ? 's' : ''}/week</div>` : '<div style="font-size:12px;color:var(--text2);">Tap to enable</div>'}
+      </div>
+      ${m.active ? `<input type="number" value="${m.goal}" min="1" max="20" onclick="event.stopPropagation()" onchange="obMetrics[${i}].goal=parseInt(this.value)" style="width:48px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;text-align:center;outline:none;">` : ''}
+      <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${m.active ? m.color : 'var(--border)'};background:${m.active ? m.color : 'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        ${m.active ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+      </div>
+    </div>`).join('');
+}
+
+function toggleMetric(i) {
+  obMetrics[i].active = !obMetrics[i].active;
+  renderObMetrics();
+}
+
+function obNext(step) {
+  if (step === 1) {
+    const name = document.getElementById('ob-name').value.trim();
+    const apiKey = document.getElementById('ob-apikey').value.trim();
+    if (!name) { showToast('⚠️ Please enter your name'); return; }
+    if (!apiKey) { showToast('⚠️ Please enter your Anthropic API key'); return; }
+  }
+  document.getElementById(`ob-step-${step}`).style.display = 'none';
+  document.getElementById(`ob-step-${step + 1}`).style.display = 'block';
+  document.getElementById(`step-dot-${step}`).classList.remove('active');
+  document.getElementById(`step-dot-${step}`).classList.add('done');
+  document.getElementById(`step-dot-${step + 1}`).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function obBack(step) {
+  document.getElementById(`ob-step-${step}`).style.display = 'none';
+  document.getElementById(`ob-step-${step - 1}`).style.display = 'block';
+  document.getElementById(`step-dot-${step}`).classList.remove('active');
+  document.getElementById(`step-dot-${step - 1}`).classList.remove('done');
+  document.getElementById(`step-dot-${step - 1}`).classList.add('active');
+}
+
+async function completeOnboarding() {
+  const name = document.getElementById('ob-name').value.trim();
+  const apiKey = document.getElementById('ob-apikey').value.trim();
+  const email = document.getElementById('ob-email').value.trim();
+  const resendKey = document.getElementById('ob-resend').value.trim();
+
+  const btn = document.querySelector('#ob-step-4 button:last-child');
+  btn.disabled = true;
+  btn.textContent = 'Setting up...';
+
+  try {
+    // Save profile
+    await supabase.from('profiles').upsert({
+      id: currentUserId,
+      full_name: name,
+      anthropic_key: apiKey,
+      digest_email: email,
+      resend_key: resendKey || null,
+      onboarding_complete: true,
+    });
+
+    // Save projects
+    const projectsToInsert = obProjects.map((p, i) => ({
+      user_id: currentUserId,
+      name: p.name,
+      icon: p.icon,
+      color: p.color,
+      sort_order: i,
+    }));
+    await supabase.from('projects').insert(projectsToInsert);
+
+    // Save life categories
+    const metricsToInsert = obMetrics.map((m, i) => ({
+      user_id: currentUserId,
+      name: m.name,
+      icon: m.icon,
+      color: m.color,
+      goal: m.goal,
+      keywords: m.keywords,
+      sort_order: i,
+      active: m.active,
+    }));
+    await supabase.from('life_categories').insert(metricsToInsert);
+
+    // Save API key locally
+    localStorage.setItem('apiKey', apiKey);
+    currentUser = name;
+
+    // Load app
+    hideAuthScreens();
+    await loadUserProjects();
+    await loadUserLifeCategories();
+    await loadKnowledge();
+    await loadCorrections();
+    await loadTasks();
+    setTimeout(saveWeeklySnapshot, 5000);
+    setupRealtime();
+    showToast('✨ Welcome to STWRD, ' + name + '!');
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = "Let's go 🚀";
+    showToast('❌ Setup failed: ' + e.message);
+  }
+}
+
 // ─── CHAT ─────────────────────────────────────────────────────
 let chatHistory = [];
 let chatOpen = false;
@@ -2390,27 +2839,18 @@ async function sendChat() {
 
   const today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', timeZone:'America/Chicago' });
 
-  const systemPrompt = `You are STWRD, Vijay Ramdon's personal AI life manager. You know everything about his life and work.
+  const projectList = userProjects.map(p => `- ${p.name}`).join('\n') || '- Personal\n- Work';
+  const systemPrompt = `You are STWRD, ${currentUser}'s personal AI life manager. You know everything about their life and work.
 
 TODAY: ${today}
 
-HIS ACTIVE TASKS:
+ACTIVE TASKS:
 ${taskSummary || 'No active tasks'}
 
 PROJECTS:
-- GNE: Luxury DJ/MC business in Dallas TX. Vijay performs at every event. Uses HoneyBook & VIBO.
-- Caliber: Director of Internal Controls at Caliber Collision. SOX compliance, PwC audits, Workiva.
-- Personal: Family life with wife Mia. Baby on the way. Home in Forney TX.
-- ServeAnts: CPA LLC, tax returns, nonprofit treasurer, AI financial advisor app.
+${projectList}
 
-Be direct, specific, and helpful. Reference his actual tasks by name. You can:
-- Give advice on what to focus on
-- Draft emails or messages (write them fully, ready to send)
-- Answer questions about his tasks and priorities
-- Help him think through decisions
-- Create action plans
-
-Keep responses concise but complete. Use bullet points for lists.`;
+Be direct, specific, and helpful. Reference actual tasks by name. Keep responses concise. Avoid excessive formatting — write like a trusted advisor, not a document.`;
 
   try {
     const messages = [
@@ -2448,22 +2888,20 @@ Keep responses concise but complete. Use bullet points for lists.`;
 async function saveDigestSettings() {
   const email = document.getElementById('digestEmailInput').value.trim();
   const resendKey = document.getElementById('resendKeyInput').value.trim();
+  const apiKey = document.getElementById('apiKeyInput').value.trim();
   if (!email) { showToast('⚠️ Enter your email address'); return; }
-  if (!resendKey) { showToast('⚠️ Enter your Resend API key'); return; }
 
   try {
-    // Upsert both settings into Supabase settings table
-    await sbFetch('settings?key=eq.digest_email', 'DELETE');
-    await sbFetch('settings?key=eq.resend_key', 'DELETE');
-    await sbFetch('settings?key=eq.anthropic_key', 'DELETE');
-    await sbFetch('settings', 'POST', { key: 'digest_email', value: email });
-    await sbFetch('settings', 'POST', { key: 'resend_key', value: resendKey });
-    // Also save anthropic key so digest cron can use it
-    const apiKey = localStorage.getItem('apiKey');
-    if (apiKey) await sbFetch('settings', 'POST', { key: 'anthropic_key', value: apiKey });
-    showToast('✓ Digest enabled — first email tomorrow at 7am CT');
+    await supabase.from('profiles').upsert({
+      id: currentUserId,
+      digest_email: email,
+      resend_key: resendKey || null,
+      anthropic_key: apiKey || null,
+    });
+    if (apiKey) localStorage.setItem('apiKey', apiKey);
+    showToast('✓ Digest settings saved');
   } catch(e) {
-    showToast('❌ Save failed — make sure settings table exists');
+    showToast('❌ Save failed: ' + e.message);
   }
 }
 
@@ -2484,12 +2922,11 @@ async function testDigest() {
 
 async function loadDigestSettings() {
   try {
-    const settings = await sbFetch('settings?select=key,value');
-    const map = {};
-    (settings || []).forEach(s => { map[s.key] = s.value; });
-    if (map['digest_email']) document.getElementById('digestEmailInput').value = map['digest_email'];
-    if (map['resend_key']) document.getElementById('resendKeyInput').value = map['resend_key'];
-  } catch(e) {} // settings table may not exist yet
+    if (!currentUserId) return;
+    const { data } = await supabase.from('profiles').select('digest_email,resend_key,anthropic_key').eq('id', currentUserId).single();
+    if (data?.digest_email) document.getElementById('digestEmailInput').value = data.digest_email;
+    if (data?.resend_key) document.getElementById('resendKeyInput').value = data.resend_key;
+  } catch(e) {}
 }
 
 // ─── VOICE INPUT ──────────────────────────────────────────────
@@ -2537,7 +2974,7 @@ function toggleMic() {
 }
 </script>
 <!-- CHAT BUTTON -->
-<button id="chatBtn" onclick="toggleChat()" style="
+<button id="chatBtn" onclick="toggleChat()" style="display:none;
   position:fixed;
   bottom:90px;
   right:16px;

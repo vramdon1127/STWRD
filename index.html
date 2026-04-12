@@ -900,18 +900,10 @@ Category guide: AI Complete=AI can fully do it without Vijay, AI Assist=needs Vi
 Raw task: ${raw}
 Added by: ${currentUser}`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/process', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, apiKey })
     });
 
     const data = await response.json();
@@ -972,21 +964,11 @@ async function runAiTask(taskId) {
   document.getElementById('aiModal').style.display = 'flex';
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const aiPrompt = `You are Vijay Ramdon's AI chief of staff. Complete this task fully and present the result clearly:\n\n${task.cleaned_task || task.content}\n\nContext: This is a ${task.project} task.`;
+    const response = await fetch('/api/process', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `You are Vijay Ramdon's AI chief of staff. Complete this task fully and present the result clearly:\n\n${task.cleaned_task || task.content}\n\nContext: This is a ${task.project} task.`
-        }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: aiPrompt, apiKey, maxTokens: 1000 })
     });
 
     const data = await response.json();

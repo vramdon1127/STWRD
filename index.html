@@ -1158,23 +1158,24 @@ let knowledgeBase = {};
 let corrections = [];
 
 window.addEventListener('load', async () => {
-  // Check auth state
+  // Handle auth callback from Google OAuth redirect
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    // Let Supabase process the hash and establish session
+    await new Promise(r => setTimeout(r, 500));
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (session) {
+      window.location.hash = '';
+      await initApp(session.user);
+      return;
+    }
+  }
+
+  // Check existing session
   const { data: { session } } = await sbClient.auth.getSession();
-  
   if (!session) {
     showAuthScreen();
     return;
-  }
-
-  // Auth callback handling (after Google redirect)
-  const hash = window.location.hash;
-  if (hash && hash.includes('access_token')) {
-    const { data: { session: newSession } } = await sbClient.auth.getSession();
-    if (newSession) {
-      window.location.hash = '';
-      await initApp(newSession.user);
-      return;
-    }
   }
 
   await initApp(session.user);

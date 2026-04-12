@@ -672,7 +672,8 @@
 <body>
 
 <header>
-  <div class="logo">Chief of Staff</div>
+  <div class="logo" onclick="showView('capture')" style="cursor:pointer;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Chief of Staff</div>
   <div class="user-badge" onclick="switchUser()">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
     <span id="currentUser">Vijay</span>
@@ -1367,9 +1368,9 @@ async function renderStats() {
         <div class="stat-value" style="color:var(--accent3)">${dueToday}</div>
         <div class="stat-label">Due Today →</div>
       </div>
-      <div class="stat-card" style="border-color:rgba(67,233,123,0.3);">
+      <div class="stat-card" onclick="showCompletedDrilldown('${weekAgoStr}')" style="border-color:rgba(67,233,123,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='rgba(67,233,123,0.3)'">
         <div class="stat-value" style="color:var(--accent3)">${completedThisWeek}</div>
-        <div class="stat-label">Done This Week</div>
+        <div class="stat-label">Done This Week →</div>
       </div>
     </div>
 
@@ -1761,6 +1762,50 @@ function showDrilldown(title, filterFn) {
       </div>
     </div>`;
   }).join('');
+}
+
+async function showCompletedDrilldown(since) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-drilldown').classList.add('active');
+  document.getElementById('nav-stats').classList.add('active');
+  document.getElementById('drilldownTitle').textContent = 'Completed This Week';
+
+  const list = document.getElementById('drilldownList');
+  list.innerHTML = '<div style="color:var(--text2);font-size:14px;text-align:center;padding:20px;">Loading...</div>';
+
+  try {
+    const completed = await sbFetch(`tasks?status=eq.done&created_at=gte.${since}T00:00:00Z&order=completed_at.desc&limit=100`) || [];
+
+    if (completed.length === 0) {
+      list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✨</div><div class="empty-state-title">No completed tasks yet this week</div><div class="empty-state-sub">Complete tasks to see them here</div></div>`;
+      return;
+    }
+
+    const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
+
+    list.innerHTML = completed.map(task => {
+      const projColor = projColors[task.project] || 'var(--accent)';
+      const completedDate = task.completed_at ? new Date(task.completed_at).toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'America/Chicago'}) : '';
+      return `
+      <div class="task-card" style="opacity:0.8;">
+        <div class="task-card-top">
+          <div class="task-check checked">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="task-body">
+            <div class="task-title" style="text-decoration:line-through;color:var(--text2);">${task.cleaned_task || task.content}</div>
+            <div class="task-meta">
+              <span style="font-size:11px;color:${projColor};font-weight:600;">${task.project || ''}</span>
+              ${completedDate ? `<span style="font-size:11px;color:var(--text2);">✓ ${completedDate}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--accent2);text-align:center;padding:20px;">Could not load completed tasks</div>';
+  }
 }
 
 function renderDrilldownAfterToggle(taskId) {

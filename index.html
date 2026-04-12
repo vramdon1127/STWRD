@@ -1551,6 +1551,14 @@ async function renderStats() {
   loadAiAdvisor(active, today, completionRate, completedThisWeek, lifeScores);
 }
 
+function refreshAdvisor() {
+  localStorage.removeItem('advisorCache');
+  localStorage.removeItem('advisorFingerprint');
+  const el = document.getElementById('aiAdvisorContent');
+  if (el) el.innerHTML = 'Regenerating insights...';
+  renderStats();
+}
+
 async function loadAiAdvisor(active, today, completionRate, completedThisWeek, lifeScores = []) {
   const apiKey = localStorage.getItem('apiKey');
   if (!apiKey || active.length === 0) {

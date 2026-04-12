@@ -811,7 +811,26 @@ window.addEventListener('load', () => {
   const saved = localStorage.getItem('apiKey');
   if (saved) document.getElementById('apiKeyInput').value = saved;
   loadTasks();
+  setupRealtime();
 });
+
+// ─── REALTIME POLLING ─────────────────────────────────────────
+function setupRealtime() {
+  setInterval(async () => {
+    try {
+      const data = await sbFetch('tasks?order=created_at.desc&status=neq.done&limit=100');
+      const newTasks = data || [];
+      const oldIds = JSON.stringify(tasks.map(t => t.id + t.status));
+      const newIds = JSON.stringify(newTasks.map(t => t.id + t.status));
+      if (oldIds !== newIds) {
+        tasks = newTasks;
+        renderTasks();
+        renderStats();
+        showToast('✨ Tasks updated');
+      }
+    } catch(e) {}
+  }, 8000);
+}
 
 // ─── SUPABASE HELPERS ─────────────────────────────────────────
 async function sbFetch(path, method = 'GET', body = null) {

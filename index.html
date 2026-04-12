@@ -935,6 +935,18 @@
       </div>
     </div>
     <div class="settings-section">
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
+        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">🧠 Refine Life Balance Keywords</div>
+        <div class="settings-value" style="margin-bottom:12px;">STWRD analyzes your task history and suggests better keywords for each Life Balance category — so your score reflects how you actually live, not generic defaults.</div>
+        <button onclick="refineLifeBalance()" id="refineBtn" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Analyze My Tasks
+        </button>
+        <div id="refineResult" style="margin-top:12px;width:100%;"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-row" style="cursor: default; flex-direction: column; align-items: flex-start;">
         <div class="settings-label" style="font-weight: 600;">About</div>
         <div class="settings-value" style="margin-top: 4px;">STWRD v2.0 · Your personal life management system</div>
@@ -2915,6 +2927,117 @@ Be direct, specific, and helpful. Reference actual tasks by name. Keep responses
   }
 }
 
+
+
+// ─── REFINE LIFE BALANCE ──────────────────────────────────────
+async function refineLifeBalance() {
+  const apiKey = localStorage.getItem('apiKey');
+  if (!apiKey) { showToast('⚠️ Add your API key in Settings first'); return; }
+  if (tasks.length < 5) { showToast('⚠️ Add at least 5 tasks first so I can learn your patterns'); return; }
+
+  const btn = document.getElementById('refineBtn');
+  const resultEl = document.getElementById('refineResult');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Analyzing your tasks...';
+  resultEl.innerHTML = '';
+
+  const taskSample = tasks.slice(0, 80).map(t => t.cleaned_task || t.content).join('\n');
+
+  // Get current life categories
+  let categories = userLifeCategories.length > 0 ? userLifeCategories : [
+    { name: 'Work' }, { name: 'Family' }, { name: 'Health' },
+    { name: 'Faith' }, { name: 'Finance' }, { name: 'Growth' }, { name: 'Recharge' }
+  ];
+
+  const categoryNames = categories.filter(c => c.active !== false).map(c => c.name).join(', ');
+
+  const prompt = `You are analyzing someone's task list to identify keyword patterns for life balance scoring.
+
+Their active Life Balance categories: ${categoryNames}
+
+Their recent tasks:
+${taskSample}
+
+For each category, identify 5-8 specific keywords or phrases that actually appear (or should appear) in their tasks to signal that category. Be specific to THEIR language and life — not generic.
+
+Respond in this exact format, one category per line:
+CATEGORY_NAME: keyword1, keyword2, keyword3, keyword4, keyword5
+
+Only include categories from this list: ${categoryNames}
+Do not add explanation, just the formatted lines.`;
+
+  try {
+    const response = await fetch('/api/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, apiKey, maxTokens: 400 })
+    });
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+
+    // Parse the response
+    const lines = text.trim().split('\n').filter(l => l.includes(':'));
+    const suggestions = {};
+    lines.forEach(line => {
+      const [cat, kws] = line.split(':');
+      if (cat && kws) {
+        suggestions[cat.trim()] = kws.trim();
+      }
+    });
+
+    if (Object.keys(suggestions).length === 0) {
+      resultEl.innerHTML = '<div style="color:var(--text2);font-size:13px;">Could not parse suggestions. Try again.</div>';
+      return;
+    }
+
+    // Render suggestions with approve buttons
+    resultEl.innerHTML = `
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Based on your tasks, here are suggested keywords. Approve the ones that fit:</div>
+      ${Object.entries(suggestions).map(([cat, kws]) => `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="font-size:13px;font-weight:600;">${cat}</div>
+            <button onclick="approveKeywords('${cat}', '${kws}')" style="padding:4px 12px;border-radius:6px;border:none;background:var(--accent);color:white;font-size:11px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;">Apply</button>
+          </div>
+          <div style="font-size:12px;color:var(--text2);">${kws}</div>
+        </div>`).join('')}
+      <button onclick="approveAllKeywords(${JSON.stringify(suggestions).replace(/"/g, '&quot;')})" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--accent3);color:#0a0a0f;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;margin-top:4px;">✓ Apply All</button>
+    `;
+
+  } catch(e) {
+    resultEl.innerHTML = '<div style="color:var(--accent2);font-size:13px;">Analysis failed. Try again.</div>';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> Analyze My Tasks';
+  }
+}
+
+async function approveKeywords(categoryName, keywords) {
+  try {
+    const kwArray = keywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
+    // Find category in DB and update
+    const cat = userLifeCategories.find(c => c.name === categoryName);
+    if (cat) {
+      const merged = [...new Set([...(cat.keywords || []), ...kwArray])];
+      await sbClient.from('life_categories')
+        .update({ keywords: merged })
+        .eq('id', cat.id)
+        .eq('user_id', currentUserId);
+      cat.keywords = merged;
+      showToast(`✓ ${categoryName} keywords updated`);
+    }
+  } catch(e) {
+    showToast('❌ Update failed: ' + e.message);
+  }
+}
+
+async function approveAllKeywords(suggestions) {
+  for (const [cat, kws] of Object.entries(suggestions)) {
+    await approveKeywords(cat, kws);
+  }
+  showToast('✓ All keywords updated — your Life Balance is now personalized');
+  document.getElementById('refineResult').innerHTML = '<div style="color:var(--personal);font-size:13px;text-align:center;padding:8px;">✓ Applied! Your Life Balance scoring now reflects your actual life.</div>';
+}
 
 // ─── DIGEST SETTINGS ──────────────────────────────────────────
 async function saveDigestSettings() {

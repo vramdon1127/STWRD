@@ -733,6 +733,11 @@
     <div class="stats-grid" id="statsGrid"></div>
   </div>
 
+  <!-- TODAY VIEW -->
+  <div class="view" id="view-today">
+    <div id="todayContent"></div>
+  </div>
+
   <!-- SETTINGS VIEW -->
   <div class="view" id="view-settings">
     <div class="settings-section">
@@ -783,6 +788,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     Capture
   </button>
+  <button class="nav-item" id="nav-today" onclick="showView('today')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="16" r="2" fill="currentColor"/></svg>
+    Today
+  </button>
   <button class="nav-item" id="nav-stats" onclick="showView('stats')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
     Dashboard
@@ -829,6 +838,10 @@
         <button onclick="selectPriority('P3',this)" class="priority-btn" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--p3);font-family:'Syne',sans-serif;font-weight:700;cursor:pointer;">P3</button>
         <button onclick="selectPriority('P4',this)" class="priority-btn" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--p4);font-family:'Syne',sans-serif;font-weight:700;cursor:pointer;">P4</button>
       </div>
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px;">DUE DATE (optional)</label>
+      <input type="date" id="editDueDate" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
     </div>
     <div class="modal-actions">
       <button class="modal-btn primary" onclick="saveEdit()">Save Changes</button>
@@ -906,6 +919,7 @@ function setupRealtime() {
         renderTasks();
         if (currentProject) renderProjectTasks();
         renderStats();
+        renderToday();
         showToast('✨ Tasks updated');
       }
     } catch(e) {}
@@ -1010,10 +1024,12 @@ TASK: [cleaned, concise, actionable version of the task]
 CATEGORY: [AI Complete OR AI Assist OR Manual]
 PROJECT: [GNE OR Caliber OR Personal OR ServeAnts]
 PRIORITY: [P1 OR P2 OR P3 OR P4]
+DUE: [YYYY-MM-DD if a date is mentioned, otherwise none]
 REASON: [one short sentence why]
 
 Priority guide: P1=urgent/today, P2=important/this week, P3=normal, P4=low/someday
 Category guide: AI Complete=AI can fully do it without Vijay, AI Assist=needs Vijay's input, Manual=must be done by Vijay alone
+Due date guide: Extract any date mentioned (e.g. "tomorrow", "Friday", "next week", "April 15"). Today is ${new Date().toISOString().split('T')[0]}
 
 Raw task: ${raw}
 Added by: ${currentUser}`;
@@ -1035,12 +1051,16 @@ Added by: ${currentUser}`;
       return match ? match[1].trim() : '';
     };
 
+    const dueRaw = get('DUE');
+    const dueDate = dueRaw && dueRaw !== 'none' && dueRaw.match(/\d{4}-\d{2}-\d{2}/) ? dueRaw.match(/\d{4}-\d{2}-\d{2}/)[0] : null;
+
     const task = {
       content: raw,
       cleaned_task: get('TASK'),
       category: get('CATEGORY'),
       project: get('PROJECT'),
       priority: get('PRIORITY'),
+      due_date: dueDate,
       status: 'todo',
       added_by: currentUser
     };
@@ -1245,6 +1265,7 @@ function renderProjectTasks() {
             ${task.category ? `<span class="tag ${catClass}">${task.category}</span>` : ''}
             ${task.priority ? `<span class="tag ${priClass}">${task.priority}</span>` : ''}
             ${task.added_by ? `<span class="tag tag-added-by">${task.added_by}</span>` : ''}
+            ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date}</span>` : ''}
           </div>
           <div class="task-actions">
             ${isAiComplete ? `<button class="task-action-btn ai-run" onclick="runAiTask('${task.id}')">🤖 Run with AI</button>` : ''}
@@ -1311,6 +1332,7 @@ function showView(name) {
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'stats') renderStats();
   if (name === 'settings') loadKnowledgeEditor();
+  if (name === 'today') renderToday();
 }
 
 function setFilter(filter, btn) {
@@ -1366,6 +1388,7 @@ function openEditModal(taskId) {
     btn.style.background = btn.textContent === editingPriority ? 'var(--accent)' : 'var(--surface2)';
     btn.style.color = btn.textContent === editingPriority ? 'white' : `var(--${btn.textContent.toLowerCase()})`;
   });
+  document.getElementById('editDueDate').value = task.due_date || '';
   document.getElementById('editModal').style.display = 'flex';
 }
 
@@ -1413,11 +1436,13 @@ async function saveEdit() {
   }
 
   // Update the task
+  const newDueDate = document.getElementById('editDueDate').value || null;
   const updates = {
     cleaned_task: newName,
     project: newProject,
     category: newCategory,
-    priority: newPriority
+    priority: newPriority,
+    due_date: newDueDate
   };
 
   await updateTask(editingTaskId, updates);
@@ -1431,6 +1456,77 @@ async function saveEdit() {
   if (currentProject) renderProjectTasks();
   renderStats();
   showToast(projectChanged ? `✓ Moved to ${newProject} — Claude will learn from this` : '✓ Task updated');
+}
+
+// ─── TODAY VIEW ───────────────────────────────────────────────
+function renderToday() {
+  const today = new Date().toISOString().split('T')[0];
+  const todayTasks = tasks.filter(t => t.due_date === today);
+  const overdue = tasks.filter(t => t.due_date && t.due_date < today);
+  const upcoming = tasks.filter(t => t.due_date && t.due_date > today).slice(0, 5);
+
+  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  let html = `
+    <div style="margin-bottom:20px;">
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">Today</div>
+      <div style="color:var(--text2);font-size:14px;">${dateStr}</div>
+    </div>`;
+
+  if (overdue.length > 0) {
+    html += `<div style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--p1);margin-bottom:10px;">⚠️ Overdue (${overdue.length})</div>`;
+    html += overdue.map(t => renderTodayCard(t, 'overdue')).join('');
+  }
+
+  if (todayTasks.length > 0) {
+    html += `<div style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin:16px 0 10px;">Due Today (${todayTasks.length})</div>`;
+    html += todayTasks.map(t => renderTodayCard(t, 'today')).join('');
+  } else {
+    html += `<div class="empty-state" style="padding:32px 0;">
+      <div class="empty-state-icon">🎉</div>
+      <div class="empty-state-title">Nothing due today!</div>
+      <div class="empty-state-sub">Add due dates to tasks to see them here</div>
+    </div>`;
+  }
+
+  if (upcoming.length > 0) {
+    html += `<div style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin:16px 0 10px;">Coming Up</div>`;
+    html += upcoming.map(t => renderTodayCard(t, 'upcoming')).join('');
+  }
+
+  document.getElementById('todayContent').innerHTML = html;
+}
+
+function renderTodayCard(task, type) {
+  const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
+  const color = projColors[task.project] || 'var(--accent)';
+  const borderColor = type === 'overdue' ? 'var(--p1)' : type === 'today' ? 'var(--accent3)' : 'var(--border)';
+  const dueLabel = type === 'overdue' ? `Due ${task.due_date}` : type === 'upcoming' ? `Due ${task.due_date}` : 'Due Today';
+  
+  return `<div style="background:var(--surface);border:1px solid ${borderColor};border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+    <div style="width:4px;height:40px;background:${color};border-radius:2px;flex-shrink:0;"></div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px;">${task.cleaned_task || task.content}</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:11px;color:${color};font-weight:600;">${task.project}</span>
+        <span style="font-size:11px;color:var(--text2);">·</span>
+        <span style="font-size:11px;color:${type === 'overdue' ? 'var(--p1)' : 'var(--text2)'};">${dueLabel}</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button onclick="openEditModal('${task.id}')" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;">Edit</button>
+      <button onclick="quickComplete('${task.id}')" style="padding:6px 10px;border-radius:8px;border:none;background:var(--accent3);color:#0a0a0f;font-size:11px;font-weight:700;cursor:pointer;">Done</button>
+    </div>
+  </div>`;
+}
+
+async function quickComplete(taskId) {
+  await updateTask(taskId, { status: 'done' });
+  tasks = tasks.filter(t => t.id !== taskId);
+  renderToday();
+  renderTasks();
+  renderStats();
+  showToast('✓ Task completed!');
 }
 
 function loadKnowledgeEditor() {

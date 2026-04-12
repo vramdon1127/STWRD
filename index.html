@@ -738,6 +738,18 @@
     <div id="todayContent"></div>
   </div>
 
+  <!-- DRILL DOWN VIEW -->
+  <div class="view" id="view-drilldown">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button onclick="showView('stats')" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;display:flex;align-items:center;gap:6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;" id="drilldownTitle"></div>
+    </div>
+    <div id="drilldownList"></div>
+  </div>
+
   <!-- SETTINGS VIEW -->
   <div class="view" id="view-settings">
     <div class="settings-section">
@@ -1343,15 +1355,15 @@ async function renderStats() {
 
     <!-- TOP STATS ROW -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
-      <div class="stat-card" onclick="showView('capture')" style="border-color:rgba(108,99,255,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='rgba(108,99,255,0.3)'">
+      <div class="stat-card" onclick="showDrilldown('All Active Tasks', t => true)" style="border-color:rgba(108,99,255,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='rgba(108,99,255,0.3)'">
         <div class="stat-value" style="color:var(--accent)">${total}</div>
         <div class="stat-label">Active Tasks →</div>
       </div>
-      <div class="stat-card" onclick="showView('capture')" style="border-color:rgba(255,68,68,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--p1)'" onmouseout="this.style.borderColor='rgba(255,68,68,0.3)'">
+      <div class="stat-card" onclick="showDrilldown('Urgent Tasks (P1)', t => t.priority === 'P1')" style="border-color:rgba(255,68,68,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--p1)'" onmouseout="this.style.borderColor='rgba(255,68,68,0.3)'">
         <div class="stat-value" style="color:var(--p1)">${p1}</div>
         <div class="stat-label">Urgent (P1) →</div>
       </div>
-      <div class="stat-card" onclick="showView('today')" style="border-color:rgba(67,233,123,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='rgba(67,233,123,0.3)'">
+      <div class="stat-card" onclick="showDrilldown('Due Today', t => t.due_date === '${today}')" style="border-color:rgba(67,233,123,0.3);cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='rgba(67,233,123,0.3)'">
         <div class="stat-value" style="color:var(--accent3)">${dueToday}</div>
         <div class="stat-label">Due Today →</div>
       </div>
@@ -1377,7 +1389,7 @@ async function renderStats() {
     <div class="stat-card" style="margin-bottom:16px;">
       <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:14px;">Project Breakdown</div>
       ${projData.map(p => `
-        <div style="margin-bottom:12px;cursor:pointer;" onclick="openProject('${p.name}');showView('capture');">
+        <div style="margin-bottom:12px;cursor:pointer;" onclick="showDrilldown('${p.name} Tasks', t => t.project === '${p.name}')">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
             <span style="font-size:13px;color:${p.color};font-weight:600;">${p.name} →</span>
             <span style="font-size:13px;color:var(--text2);">${p.count} tasks</span>
@@ -1485,14 +1497,15 @@ Focus on: quick wins, stress reduction, what AI can do for him, overdue items, o
     const el = document.getElementById('aiAdvisorContent');
     if (!el || insights.length === 0) return;
 
-    el.innerHTML = insights.map(i => `
-      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+        const fmt = s => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    el.innerHTML = insights.map((i,idx) => `
+      <div style="margin-bottom:${idx < insights.length-1 ? '14px;padding-bottom:14px;border-bottom:1px solid var(--border)' : '0px'};">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
           <span style="font-size:18px;">${i.emoji}</span>
-          <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;">${i.title}</span>
+          <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;">${fmt(i.title)}</span>
         </div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.5;padding-left:26px;">${i.body}</div>
-      </div>`).join('').replace(/border-bottom:1px solid var\(--border\);">\s*$/, '">');
+        <div style="font-size:13px;color:var(--text2);line-height:1.5;padding-left:26px;">${fmt(i.body)}</div>
+      </div>`).join('');
 
   } catch(e) {
     const el = document.getElementById('aiAdvisorContent');
@@ -1703,6 +1716,56 @@ async function quickComplete(taskId) {
   renderTasks();
   renderStats();
   showToast('✓ Task completed!');
+}
+
+// ─── DRILL DOWN VIEW ──────────────────────────────────────────
+function showDrilldown(title, filterFn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-drilldown').classList.add('active');
+  document.getElementById('nav-stats').classList.add('active');
+  document.getElementById('drilldownTitle').textContent = title;
+
+  const filtered = tasks.filter(filterFn);
+  const list = document.getElementById('drilldownList');
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✨</div><div class="empty-state-title">Nothing here</div></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(task => {
+    const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
+    const catClass = `tag-cat-${(task.category || '').toLowerCase().replace(/ /g,'-')}`;
+    const priClass = `tag-${(task.priority || 'p3').toLowerCase()}`;
+    const projColor = projColors[task.project] || 'var(--accent)';
+    return `
+    <div class="task-card">
+      <div class="task-card-top">
+        <div class="task-check ${task.status === 'done' ? 'checked' : ''}" onclick="toggleDone('${task.id}');renderDrilldownAfterToggle('${task.id}')">
+          ${task.status === 'done' ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+        </div>
+        <div class="task-body">
+          <div class="task-title">${task.cleaned_task || task.content}</div>
+          <div class="task-meta">
+            <span style="font-size:11px;color:${projColor};font-weight:600;">${task.project || ''}</span>
+            ${task.category ? `<span class="tag ${catClass}">${task.category}</span>` : ''}
+            ${task.priority ? `<span class="tag ${priClass}">${task.priority}</span>` : ''}
+            ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date.split('-').slice(1).concat(task.due_date.split('-')[0]).join('/')}</span>` : ''}
+          </div>
+          <div class="task-actions">
+            <button class="task-action-btn" onclick="openEditModal('${task.id}')">✏️ Edit</button>
+            <button class="task-action-btn danger" onclick="removeTask('${task.id}')">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDrilldownAfterToggle(taskId) {
+  // re-render drilldown after a task is toggled
+  setTimeout(() => renderStats(), 300);
 }
 
 function loadKnowledgeEditor() {

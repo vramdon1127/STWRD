@@ -1310,7 +1310,7 @@ async function loadCorrections() {
 function setupRealtime() {
   setInterval(async () => {
     try {
-      const data = await sbFetch(`tasks?user_id=eq.${currentUserId}&order=created_at.desc&status=neq.done&limit=100`);
+      const { data } = await sbClient.from('tasks').select('*').eq('user_id', currentUserId).neq('status', 'done').order('created_at', { ascending: false }).limit(100);
       const newTasks = data || [];
       const oldIds = JSON.stringify(tasks.map(t => t.id + t.status));
       const newIds = JSON.stringify(newTasks.map(t => t.id + t.status));
@@ -1381,7 +1381,14 @@ async function loadUserLifeCategories() {
 
 async function loadTasks() {
   try {
-    const data = await sbFetch(`tasks?user_id=eq.${currentUserId}&order=created_at.desc&status=neq.done&limit=100`);
+    const { data, error } = await sbClient
+      .from('tasks')
+      .select('*')
+      .eq('user_id', currentUserId)
+      .neq('status', 'done')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
     tasks = data || [];
     renderTasks();
     renderStats();
@@ -1392,15 +1399,19 @@ async function loadTasks() {
 }
 
 async function saveTask(task) {
-  return await sbFetch('tasks', 'POST', { ...task, user_id: currentUserId });
+  const { data, error } = await sbClient.from('tasks').insert({ ...task, user_id: currentUserId }).select();
+  if (error) throw error;
+  return data?.[0];
 }
 
 async function updateTask(id, updates) {
-  await sbFetch(`tasks?id=eq.${id}`, 'PATCH', updates);
+  const { error } = await sbClient.from('tasks').update(updates).eq('id', id).eq('user_id', currentUserId);
+  if (error) throw error;
 }
 
 async function deleteTask(id) {
-  await sbFetch(`tasks?id=eq.${id}`, 'DELETE');
+  const { error } = await sbClient.from('tasks').delete().eq('id', id).eq('user_id', currentUserId);
+  if (error) throw error;
 }
 
 // ─── PROCESS TASK ─────────────────────────────────────────────
@@ -2398,14 +2409,14 @@ async function saveApiKey() {
 }
 
 async function clearDone() {
-  await sbFetch(`tasks?user_id=eq.${currentUserId}&status=eq.done`, 'DELETE');
+  await sbClient.from('tasks').delete().eq('user_id', currentUserId).eq('status', 'done');
   await loadTasks();
   showToast('Completed tasks cleared');
 }
 
 async function clearAll() {
   if (!confirm('Delete ALL tasks? This cannot be undone.')) return;
-  await sbFetch(`tasks?user_id=eq.${currentUserId}`, 'DELETE');
+  await sbClient.from('tasks').delete().eq('user_id', currentUserId);
   tasks = [];
   renderTasks();
   renderStats();

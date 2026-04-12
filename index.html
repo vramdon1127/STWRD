@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Chief of Staff">
-<title>Chief of Staff</title>
+<meta name="apple-mobile-web-app-title" content="Steward">
+<title>Steward</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -685,7 +685,7 @@
 
 <header>
   <div class="logo" onclick="showView('capture')" style="cursor:pointer;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Chief of Staff</div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Steward</div>
   <div class="user-badge" onclick="switchUser()">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
     <span id="currentUser">Vijay</span>
@@ -801,7 +801,7 @@
     <div class="settings-section">
       <div class="settings-row" style="cursor: default; flex-direction: column; align-items: flex-start;">
         <div class="settings-label" style="font-weight: 600;">About</div>
-        <div class="settings-value" style="margin-top: 4px;">Chief of Staff v1.0 · Built for Vijay & Family</div>
+        <div class="settings-value" style="margin-top: 4px;">Steward v1.0 · Built for Vijay & Family</div>
       </div>
     </div>
   </div>
@@ -1029,7 +1029,7 @@ async function processTask() {
     const pers = knowledgeBase['Personal'] || 'Personal life tasks';
     const sa = knowledgeBase['ServeAnts'] || 'ServeAnts CPA LLC';
 
-    const prompt = `You are a personal AI chief of staff for Vijay Ramdon. He runs multiple ventures:
+    const prompt = `You are Steward, a personal AI life manager for Vijay Ramdon. He runs multiple ventures:
 
 GNE: ${gne}
 
@@ -1137,7 +1137,7 @@ async function runAiTask(taskId) {
     const gneContext = `GNE CONTEXT: Luxury DJ/MC company in Dallas TX. Vijay's voice is warm, faith-aligned, personal. Key phrases: "We would be absolutely HONORED", "Can't wait to make it an amazing night!". Packages: Elegant ($2,600-$3,200), Signature ($3,600-$4,400), Luxurious ($5,000-$6,200). Tools: HoneyBook, VIBO. MCs: Caleb, Jono. Always write in first person as Vijay. End with a clear next step. Scheduling link: https://bit.ly/GNEVideoCall`;
     const caliberContext = `CALIBER CONTEXT: Vijay is Director of Internal Controls at Caliber Collision. SOX compliance with PwC as external auditor and Protiviti as co-sourced IA. Key systems: Workday, CCC ONE, FastPath, Workiva, CertiTrack. Active projects: UAR/SOD cycles, AP narrative, account reconciliation tool, DOA rollout. Key contacts: Grant Willard, Craig James, Amit Patel, Jessica Knabe, Yvette Dubey. Communication style: professional, concise, no filler. Go straight to the revision. Peer-level tone with auditors. Write in first person as Vijay.`;
     const projectContext = task.project === 'GNE' ? gneContext : task.project === 'Caliber' ? caliberContext : '';
-    const aiPrompt = `You are Vijay Ramdon's AI chief of staff. Complete this task fully and present the result clearly. ${projectContext}\n\nTask: ${task.cleaned_task || task.content}\n\nProvide the complete deliverable ready to use — draft the email, write the script, create the timeline, etc. Don't explain what you're doing, just do it.`;
+    const aiPrompt = `You are Steward, Vijay Ramdon's personal AI. Complete this task fully and present the result clearly. ${projectContext}\n\nTask: ${task.cleaned_task || task.content}\n\nProvide the complete deliverable ready to use — draft the email, write the script, create the timeline, etc. Don't explain what you're doing, just do it.`;
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1597,7 +1597,7 @@ async function loadAiAdvisor(active, today, completionRate, completedThisWeek, l
     `[${t.project}][${t.category}][${t.priority}]${t.due_date ? '[due:'+t.due_date+']' : ''} ${t.cleaned_task || t.content}`
   ).join('\n');
 
-  const prompt = `You are Vijay Ramdon's personal AI chief of staff. His wife Mia wants him to have better life balance. Analyze his tasks and life balance and give him 3 specific, actionable insights.
+  const prompt = `You are Steward, Vijay Ramdon's personal AI life manager. His wife Mia wants him to have better life balance. Analyze his tasks and life balance and give him 3 specific, actionable insights.
 
 His tasks right now:
 ${taskSummary}
@@ -2075,7 +2075,7 @@ async function sendChat() {
 
   const today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', timeZone:'America/Chicago' });
 
-  const systemPrompt = `You are Vijay Ramdon's personal AI Chief of Staff. You know everything about his life and work.
+  const systemPrompt = `You are Steward, Vijay Ramdon's personal AI life manager. You know everything about his life and work.
 
 TODAY: ${today}
 
@@ -2215,7 +2215,7 @@ function toggleMic() {
     <div style="display:flex;align-items:center;gap:10px;">
       <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:16px;">🧠</div>
       <div>
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">Chief of Staff</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">Steward</div>
         <div style="font-size:11px;color:var(--personal);">● Online</div>
       </div>
     </div>
@@ -2225,7 +2225,7 @@ function toggleMic() {
   <!-- MESSAGES -->
   <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
     <div style="background:var(--surface2);border-radius:16px 16px 16px 4px;padding:14px;max-width:85%;font-size:14px;line-height:1.5;">
-      Hey Vijay! I'm your Chief of Staff. I have full context on all your tasks, projects, and priorities. What do you need?
+      Hey Vijay! I'm Steward, your personal AI life manager. I have full context on all your tasks, projects, and priorities. What do you need?
     </div>
   </div>
 

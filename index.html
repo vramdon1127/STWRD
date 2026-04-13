@@ -1977,7 +1977,7 @@ Added by: ${currentUser}`;
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, apiKey })
+      body: JSON.stringify({ prompt, apiKey, provider: (currentUserProfile?.preferred_ai || selectedAI || 'claude') })
     });
 
     const data = await response.json();
@@ -2109,7 +2109,7 @@ async function callAiAndDisplay(prompt) {
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, apiKey, maxTokens: 1200 })
+      body: JSON.stringify({ prompt, apiKey, maxTokens: 1200, provider: (currentUserProfile?.preferred_ai || selectedAI || 'claude') })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message);
@@ -2691,7 +2691,7 @@ Focus on: quick wins, stress reduction, what AI can do for him, overdue items, o
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, apiKey, maxTokens: 400 })
+      body: JSON.stringify({ prompt, apiKey, maxTokens: 400, provider: (currentUserProfile?.preferred_ai || selectedAI || 'claude') })
     });
     const data = await response.json();
     const text = data.content?.[0]?.text || '';
@@ -4323,7 +4323,8 @@ Be direct, specific, and helpful. Reference actual tasks by name. Keep responses
         prompt: msg,
         systemPrompt,
         messages: chatHistory.slice(-8),
-        maxTokens: 800
+        maxTokens: 800,
+        provider: (currentUserProfile?.preferred_ai || selectedAI || 'claude')
       })
     });
 
@@ -4383,7 +4384,7 @@ Do not add explanation, just the formatted lines.`;
     const response = await fetch('/api/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, apiKey, maxTokens: 400 })
+      body: JSON.stringify({ prompt, apiKey, maxTokens: 400, provider: (currentUserProfile?.preferred_ai || selectedAI || 'claude') })
     });
     const data = await response.json();
     const text = data.content?.[0]?.text || '';

@@ -2558,6 +2558,9 @@ function openEditModal(taskId) {
   document.getElementById('editDueDate').value = task.due_date || '';
   document.getElementById('editNotes').value = task.notes || '';
   document.getElementById('editModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
 }
 
 function selectPriority(p, btn) {
@@ -2573,6 +2576,9 @@ function selectPriority(p, btn) {
 function closeEditModal() {
   document.getElementById('editModal').style.display = 'none';
   editingTaskId = null;
+  document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.width = '';
 }
 
 async function saveEdit() {

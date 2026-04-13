@@ -1404,27 +1404,53 @@ let knowledgeBase = {};
 let corrections = [];
 
 window.addEventListener('load', async () => {
-  // Handle auth callback from Google OAuth redirect
-  const hash = window.location.hash;
-  if (hash && hash.includes('access_token')) {
-    // Let Supabase process the hash and establish session
-    await new Promise(r => setTimeout(r, 500));
-    const { data: { session } } = await sbClient.auth.getSession();
-    if (session) {
-      window.location.hash = '';
-      await initApp(session.user);
+  // Failsafe: if anything below hangs, drop to auth screen after 5 seconds
+  const failsafe = setTimeout(() => {
+    console.warn('[STWRD] Init failsafe triggered — showing auth screen');
+    showAuthScreen();
+  }, 5000);
+
+  try {
+    // PKCE returns ?code=... in query string; implicit returns #access_token=... in hash
+    const url = new URL(window.location.href);
+    const hasPkceCode = url.searchParams.has('code');
+    const hasHashToken = window.location.hash.includes('access_token');
+
+    if (hasPkceCode || hasHashToken) {
+      // Let Supabase detectSessionInUrl process the return URL
+      await new Promise(r => setTimeout(r, 600));
+      // Clean the URL so we don't re-process on refresh
+      if (hasPkceCode) {
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
+        window.history.replaceState(null, '', url.pathname + (url.search || ''));
+      } else {
+        window.location.hash = '';
+      }
+    }
+
+    // Race getSession against a timeout — it can hang on Safari
+    const sessionResult = await Promise.race([
+      sbClient.auth.getSession(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('getSession timeout')), 3000))
+    ]).catch(err => {
+      console.warn('[STWRD] getSession failed:', err.message);
+      return { data: { session: null } };
+    });
+
+    const session = sessionResult?.data?.session;
+    clearTimeout(failsafe);
+
+    if (!session) {
+      showAuthScreen();
       return;
     }
-  }
-
-  // Check existing session
-  const { data: { session } } = await sbClient.auth.getSession();
-  if (!session) {
+    await initApp(session.user);
+  } catch(e) {
+    console.error('[STWRD] Init error:', e);
+    clearTimeout(failsafe);
     showAuthScreen();
-    return;
   }
-
-  await initApp(session.user);
 });
 
 // Handle auth state changes

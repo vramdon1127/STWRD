@@ -1539,8 +1539,12 @@ window.addEventListener('load', async () => {
 // Handle auth state changes
 sbClient.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session) {
-    // Replace history so swipe-back doesn't return to login screen
-    window.history.replaceState(null, '', window.location.pathname);
+    // Replace history so swipe-back doesn't return to login screen,
+    // but preserve the ?invite= param so partner linking still works
+    const url = new URL(window.location.href);
+    const invite = url.searchParams.get('invite');
+    const cleanSearch = invite ? `?invite=${encodeURIComponent(invite)}` : '';
+    window.history.replaceState(null, '', url.pathname + cleanSearch);
     await initApp(session.user);
   } else if (event === 'SIGNED_OUT') {
     showAuthScreen();

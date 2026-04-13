@@ -3903,13 +3903,12 @@ async function completeOnboarding() {
 
   try {
     if (btn) btn.textContent = 'Saving profile...';
-    // Save API key locally — profile will be updated via Settings
     localStorage.setItem('apiKey', apiKey);
     localStorage.setItem('digestEmail', email);
     localStorage.setItem('userName', name);
 
     if (btn) btn.textContent = 'Saving projects...';
-    await sbClient.from('projects').delete().eq('user_id', currentUserId);
+    await sbFetch(`projects?user_id=eq.${currentUserId}`, 'DELETE');
     const projectsToInsert = obHats.filter(p => p.name.trim()).map((p, i) => ({
       user_id: currentUserId,
       name: p.name,
@@ -3918,11 +3917,11 @@ async function completeOnboarding() {
       sort_order: i,
     }));
     if (projectsToInsert.length > 0) {
-      await sbClient.from('projects').insert(projectsToInsert);
+      await sbFetch('projects', 'POST', projectsToInsert);
     }
 
     if (btn) btn.textContent = 'Saving life areas...';
-    await sbClient.from('life_categories').delete().eq('user_id', currentUserId);
+    await sbFetch(`life_categories?user_id=eq.${currentUserId}`, 'DELETE');
     const metricsToInsert = obMetrics.filter(m => m.active).map((m, i) => {
       const customKeywords = m.context
         ? m.context.split(',').map(k => k.trim().toLowerCase()).filter(k => k.length > 0)
@@ -3940,7 +3939,7 @@ async function completeOnboarding() {
       };
     });
     if (metricsToInsert.length > 0) {
-      await sbClient.from('life_categories').insert(metricsToInsert);
+      await sbFetch('life_categories', 'POST', metricsToInsert);
     }
 
     if (btn) btn.textContent = 'Loading app...';

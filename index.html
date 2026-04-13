@@ -4650,12 +4650,17 @@ function togglePartnerPanel() {
 
 async function loadPartner() {
   try {
-    // Two simpler queries instead of one OR — PostgREST's or= syntax is fragile
+    if (!currentUserId) {
+      showToast('🔍 loadPartner: no currentUserId yet');
+      renderPartnerPanel(null);
+      return;
+    }
     let data = await sbFetch(`partnerships?inviter_id=eq.${currentUserId}&status=eq.active&limit=1`);
     if (!data || data.length === 0) {
       data = await sbFetch(`partnerships?invitee_id=eq.${currentUserId}&status=eq.active&limit=1`);
     }
-    console.log('[STWRD] loadPartner result:', data);
+    showToast('🔍 loadPartner found ' + (data?.length || 0) + ' rows');
+    console.log('[STWRD] loadPartner result:', data, 'currentUserId:', currentUserId);
     if (!data || data.length === 0) {
       renderPartnerPanel(null);
       return;
@@ -4665,8 +4670,10 @@ async function loadPartner() {
     const profileRows = await sbFetch(`profiles?id=eq.${partnerId}&select=id,display_name,digest_email,full_name`);
     const profile = Array.isArray(profileRows) ? profileRows[0] : profileRows;
     partnerData = { id: partnerId, name: profile?.display_name || profile?.full_name?.split(' ')[0] || 'Partner', profile, partnershipId: partnership.id };
+    showToast('✅ Partner loaded: ' + partnerData.name);
     renderPartnerPanel(partnerData);
   } catch(e) {
+    showToast('❌ loadPartner error: ' + e.message);
     console.error('[STWRD] loadPartner error:', e);
     renderPartnerPanel(null);
   }

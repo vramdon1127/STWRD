@@ -2212,6 +2212,7 @@ async function renderStats() {
     const pct = Math.round((matched.length / cat.goal) * 100); // uncapped so overachievement flows into score
     return { ...cat, score, pct, matched: matched.length };
   });
+  lastLifeScores = lifeScores;
 
   // Score math: base caps each category at 100%, but overachievement earns overflow credits
   // that can partially offset zeros (up to 15pts credit per zero category)
@@ -2239,8 +2240,8 @@ async function renderStats() {
           <div style="font-size:11px;color:var(--text2);">/ 100</div>
         </div>
       </div>
-      ${lifeScores.map(cat => `
-        <div onclick="showLifeDrilldown('${cat.name}', ${JSON.stringify(cat.keywords)})" style="margin-bottom:10px;cursor:pointer;border-radius:8px;padding:4px;transition:all 0.2s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+      ${lifeScores.map((cat, idx) => `
+        <div onclick="showLifeDrilldown(${idx})" data-cat-idx="${idx}" style="margin-bottom:10px;cursor:pointer;border-radius:8px;padding:4px;transition:all 0.2s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="font-size:14px;">${cat.icon}</span>
@@ -2657,10 +2658,14 @@ async function quickComplete(taskId) {
 }
 
 // ─── DRILL DOWN VIEW ──────────────────────────────────────────
-function showLifeDrilldown(catName, keywords) {
-  showDrilldown(catName + ' Tasks', t => {
+let lastLifeScores = [];
+
+function showLifeDrilldown(idx) {
+  const cat = lastLifeScores[idx];
+  if (!cat) return;
+  showDrilldown(cat.name + ' Tasks', t => {
     const text = (t.cleaned_task || t.content || '').toLowerCase();
-    return keywords.some(k => text.includes(k));
+    return cat.keywords.some(k => text.includes(k));
   });
 }
 

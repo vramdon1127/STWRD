@@ -3647,6 +3647,18 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') resetCopyBtn();
 });
 
+// Block pull-to-refresh on iOS when modal is open
+document.addEventListener('touchmove', function(e) {
+  const modal = document.getElementById('editModal');
+  const aiModal = document.getElementById('aiModal');
+  if ((modal && modal.style.display !== 'none') || (aiModal && aiModal.style.display !== 'none')) {
+    const modalContent = e.target.closest('.modal');
+    if (!modalContent) {
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
+
 function obNext(step) {
   if (step === 1) {
     const name = document.getElementById('ob-name').value.trim();

@@ -839,13 +839,17 @@
     <div id="ob-step-5" style="display:none;">
       <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Life Balance ⚖️</div>
       <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:12px;">How do you measure a well-lived life?</div>
-      <div style="background:linear-gradient(135deg,rgba(124,111,239,0.12),rgba(244,114,182,0.08));border:1px solid rgba(124,111,239,0.3);border-radius:12px;padding:14px;margin-bottom:20px;display:flex;gap:10px;align-items:flex-start;">
+      <div style="background:linear-gradient(135deg,rgba(124,111,239,0.12),rgba(244,114,182,0.08));border:1px solid rgba(124,111,239,0.3);border-radius:12px;padding:14px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start;">
         <div style="font-size:18px;flex-shrink:0;margin-top:1px;">⚡</div>
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">The more you share, the smarter STWRD starts.</div>
           <div style="font-size:12px;color:var(--text2);line-height:1.6;">These are <strong style="color:var(--text);">dimensions of life</strong> — areas like Work, Family, and Faith. STWRD tracks how your tasks distribute across them each week and scores your balance. Add keywords that help your AI recognize each area. Don't worry about perfection — STWRD learns and gets sharper over time.</div>
           <div style="font-size:11px;color:var(--text2);margin-top:8px;opacity:0.7;">e.g. Client invoice → Work · Read scripture → Faith · Gym session → Health</div>
         </div>
+      </div>
+      <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px;margin-bottom:20px;display:flex;gap:8px;align-items:flex-start;">
+        <div style="font-size:14px;flex-shrink:0;">🎩</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.5;"><strong style="color:var(--text);">Your hats are automatically matched.</strong> Tasks in your GNE, Caliber, or other project buckets will be recognized by their project name — no extra setup needed.</div>
       </div>
       <div id="ob-metrics-list" style="margin-bottom:32px;"></div>
       <!-- Add custom category -->
@@ -1181,11 +1185,12 @@
     </div>
     <div class="settings-section">
       <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
-        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">🧠 Refine Life Balance Keywords</div>
-        <div class="settings-value" style="margin-bottom:12px;">STWRD analyzes your task history and suggests better keywords for each Life Balance category — so your score reflects how you actually live, not generic defaults.</div>
+        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">🧠 Life Balance Keywords</div>
+        <div class="settings-value" style="margin-bottom:12px;">These keywords tell STWRD which life area each task belongs to. Your hat names are matched automatically. Edit to fine-tune.</div>
+        <div id="keywordEditor" style="width:100%;margin-bottom:12px;"></div>
         <button onclick="refineLifeBalance()" id="refineBtn" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          Analyze My Tasks
+          AI: Suggest Better Keywords
         </button>
         <div id="refineResult" style="margin-top:12px;width:100%;"></div>
       </div>
@@ -2479,7 +2484,7 @@ function showView(name) {
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'stats') renderStats();
   if (name === 'progress') renderProgress();
-  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); }
+  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); renderKeywordEditor(); }
   if (name === 'today') renderToday();
 }
 
@@ -3531,6 +3536,44 @@ async function updateLifeGoal(catId, newGoal) {
     showToast(`✓ ${cat.name} goal updated`);
   } catch(e) {
     showToast('❌ Could not save: ' + e.message);
+  }
+}
+
+function renderKeywordEditor() {
+  const el = document.getElementById('keywordEditor');
+  if (!el) return;
+  const cats = userLifeCategories;
+  if (!cats.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text2);">No life categories set up yet.</div>';
+    return;
+  }
+  el.innerHTML = cats.map(cat => {
+    const keywords = Array.isArray(cat.keywords) ? cat.keywords.join(', ') : '';
+    return `<div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="font-size:14px;">${cat.icon || '⚖️'}</span>
+        <span style="font-size:13px;font-weight:600;">${cat.name}</span>
+      </div>
+      <input type="text" id="kw-${cat.id}"
+        value="${keywords}"
+        placeholder="keyword1, keyword2, keyword3..."
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;"
+        onblur="saveKeywords('${cat.id}', this.value)">
+      <div style="font-size:10px;color:var(--text2);margin-top:3px;opacity:0.7;">Comma-separated. Hat names matched automatically.</div>
+    </div>`;
+  }).join('');
+}
+
+async function saveKeywords(catId, value) {
+  const keywords = value.split(',').map(k => k.trim().toLowerCase()).filter(k => k.length > 0);
+  const cat = userLifeCategories.find(c => c.id === catId);
+  if (!cat) return;
+  cat.keywords = keywords;
+  try {
+    await sbClient.from('life_categories').update({ keywords }).eq('id', catId).eq('user_id', currentUserId);
+    showToast(`✓ ${cat.name} keywords saved`);
+  } catch(e) {
+    showToast('❌ Could not save keywords');
   }
 }
 

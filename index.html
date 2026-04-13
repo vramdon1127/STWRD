@@ -4150,6 +4150,7 @@ async function completeOnboarding() {
     await loadTasks();
     setTimeout(saveWeeklySnapshot, 5000);
     setupRealtime();
+    maybeShowAiExplainer();
     showToast('✨ Welcome to STWRD, ' + name + '!');
 
     // Save profile + mark onboarding complete in background

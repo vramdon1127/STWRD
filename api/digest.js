@@ -84,7 +84,8 @@ async function sendDigestToUser(profile, resendKey) {
     }
 
     // ── Pull active tasks ───────────────────────────────────────
-    const tasks = await sbFetch('tasks?status=neq.done&order=created_at.desc&limit=100') || [];
+    const userId = profile.id;
+    const tasks = await sbFetch(`tasks?user_id=eq.${userId}&status=neq.done&order=created_at.desc&limit=100`, true) || [];
 
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
     const todayDisplay = new Date().toLocaleDateString('en-US', { 
@@ -113,7 +114,7 @@ async function sendDigestToUser(profile, resendKey) {
 
     let completedThisWeek = [];
     try {
-      completedThisWeek = await sbFetch(`tasks?status=eq.done&created_at=gte.${weekAgoStr}T00:00:00Z&limit=200`) || [];
+      completedThisWeek = await sbFetch(`tasks?user_id=eq.${userId}&status=eq.done&created_at=gte.${weekAgoStr}T00:00:00Z&limit=200`, true) || [];
     } catch(e) {}
 
     const allThisWeek = [...tasks, ...completedThisWeek];

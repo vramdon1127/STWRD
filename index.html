@@ -2179,7 +2179,7 @@ async function renderStats() {
     { name: 'Work', icon: '💼', color: '#60a5fa', keywords: ['work','meeting','email','client','invoice','project'] },
     { name: 'Family', icon: '🏠', color: '#22d3ee', keywords: ['family','home','kids','spouse','partner','baby'] },
     { name: 'Health', icon: '💪', color: '#fb923c', keywords: ['health','workout','gym','exercise','doctor','run'] },
-    { name: 'Faith', icon: '🙏', color: '#a78bfa', keywords: ['faith','church','pray','devotion','bible','worship'] },
+    { name: 'Faith', icon: '🙏', color: '#a78bfa', keywords: ['faith','pray','devotion','bible','worship','sermon','scripture','ministry','spiritual','god'] },
     { name: 'Finance', icon: '💰', color: '#fbbf24', keywords: ['finance','money','bill','budget','payment','tax'] },
     { name: 'Growth', icon: '🌱', color: '#38bdf8', keywords: ['growth','learn','read','course','study','skill'] },
     { name: 'Recharge', icon: '🎮', color: '#6b7280', keywords: ['recharge','rest','relax','game','movie','vacation'] },
@@ -2213,7 +2213,7 @@ async function renderStats() {
   const lifeScores = lifeCategories.map(cat => {
     const matched = allThisWeek.filter(t => {
       const text = ((t.cleaned_task || t.content) + ' ' + (t.project || '')).toLowerCase();
-      return cat.keywords.some(k => text.includes(k));
+      return cat.keywords.some(k => matchesKeyword(text, k));
     });
     const count = matched.length;
     const pct = Math.round((count / totalThisWeek) * 100); // % of your week this area got
@@ -2670,6 +2670,13 @@ async function quickComplete(taskId) {
 }
 
 // ─── DRILL DOWN VIEW ──────────────────────────────────────────
+// Smarter keyword matching — word boundary aware to avoid false partial matches
+function matchesKeyword(text, keyword) {
+  if (keyword.length <= 3) return text.includes(keyword); // short keywords: substring ok
+  const pattern = new RegExp('\\b' + keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  return pattern.test(text);
+}
+
 let lastLifeScores = [];
 let lastAllThisWeek = [];
 
@@ -2679,7 +2686,7 @@ function showLifeDrilldown(idx) {
   const pool = lastAllThisWeek.length > 0 ? lastAllThisWeek : tasks;
   const matched = pool.filter(t => {
     const text = ((t.cleaned_task || t.content || '') + ' ' + (t.project || '')).toLowerCase();
-    return cat.keywords.some(k => text.includes(k));
+    return cat.keywords.some(k => matchesKeyword(text, k));
   });
   // Sort: active first, done at bottom
   const sorted = [...matched.filter(t => t.status !== 'done'), ...matched.filter(t => t.status === 'done')];
@@ -2930,7 +2937,7 @@ async function saveWeeklySnapshot() {
       const allKeys = [...new Set([nameKey, ...keywords])];
       const matched = allThisWeek.filter(t => {
         const text = ((t.cleaned_task || t.content) + ' ' + (t.project || '')).toLowerCase();
-        return allKeys.some(k => text.includes(k));
+        return allKeys.some(k => matchesKeyword(text, k));
       }).length;
       lifeScores[nameKey] = Math.round((matched / snapTotal) * 100);
     });
@@ -3187,7 +3194,7 @@ const OB_DEFAULT_METRICS = [
   { name: 'Work', icon: '💼', color: '#60a5fa', goal: 5, keywords: ['meeting','email','client','invoice','audit','booking'], active: true },
   { name: 'Family', icon: '🏠', color: '#22d3ee', goal: 2, keywords: ['family','home','kids','spouse','partner','baby'], active: true },
   { name: 'Health', icon: '💪', color: '#fb923c', goal: 3, keywords: ['workout','gym','exercise','run','walk','doctor','health'], active: true },
-  { name: 'Faith', icon: '🙏', color: '#a78bfa', goal: 1, keywords: ['church','pray','devotion','bible','worship','faith','spiritual'], active: true },
+  { name: 'Faith', icon: '🙏', color: '#a78bfa', goal: 1, keywords: ['pray','devotion','bible','worship','faith','scripture','sermon','spiritual'], active: true },
   { name: 'Personal Finance', icon: '💰', color: '#fbbf24', goal: 2, keywords: ['invoice','payment','bill','budget','tax','money'], active: true },
   { name: 'Growth', icon: '🌱', color: '#38bdf8', goal: 1, keywords: ['learn','read','course','study','research','build','skill'], active: true },
   { name: 'Recharge', icon: '🎮', color: '#6b7280', goal: 1, keywords: ['rest','relax','movie','game','vacation','break'], active: false },

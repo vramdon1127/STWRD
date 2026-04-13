@@ -2160,68 +2160,71 @@ async function renderStats() {
     {
       name: 'Work', icon: '💼', color: '#60a5fa',
       keywords: ['invoice', 'client', 'meeting', 'email', 'caliber', 'gne', 'sox', 'audit', 'serveants', 'tax', 'honeybook', 'vibo', 'booking'],
-      goal: 5, unit: 'tasks/week',
-      advice: { low: 'Work tasks are piling up — focus time needed', high: 'Work output is strong this week' }
+      advice: { low: 'Work tasks are piling up — focus time needed', neglect: 'No work tasks this week' }
     },
     {
       name: 'Family', icon: '🏠', color: '#22d3ee',
-      keywords: ['mia', 'baby', 'home', 'house', 'birthday', 'gift', 'party', 'nursery', 'paint', 'mattress', 'depot', 'crue', 'jada'],
-      goal: 2, unit: 'tasks/week',
-      advice: { low: 'Family tasks are getting sidelined — easy to let slip', high: 'Family is getting real attention this week' }
+      keywords: ['mia', 'baby', 'home', 'house', 'birthday', 'gift', 'party', 'nursery', 'paint', 'mattress', 'depot', 'crue', 'jada', 'selah'],
+      advice: { low: 'Family is getting sidelined', neglect: 'No family tasks this week' }
     },
     {
       name: 'Health', icon: '💪', color: '#fb923c',
       keywords: ['workout', 'gym', 'exercise', 'run', 'walk', 'doctor', 'sleep', 'eat', 'diet', 'health', 'mental', 'meditat'],
-      goal: 3, unit: 'tasks/week',
-      advice: { low: 'No health tasks this week — easy to skip', high: 'Taking care of yourself this week' }
+      advice: { low: 'Health is getting squeezed out', neglect: 'No health tasks this week — easy to skip' }
     },
     {
       name: 'Faith', icon: '🙏', color: '#a78bfa',
       keywords: ['church', 'pray', 'devotion', 'bible', 'worship', 'faith', 'sermon', 'ministry', 'god', 'spiritual'],
-      goal: 1, unit: 'task/week',
-      advice: { low: "Faith hasn't shown up in your tasks this week", high: "Faith is present in your week" }
+      advice: { low: "Faith is light this week", neglect: "Faith hasn't shown up in your tasks" }
     },
     {
-      name: 'Personal Finance', icon: '💰', color: '#fbbf24',
+      name: 'Finance', icon: '💰', color: '#fbbf24',
       keywords: ['invoice', 'payment', 'bill', 'budget', 'tax', 'money', 'zelle', 'deposit', 'proconnect', 'plaid'],
-      goal: 2, unit: 'tasks/week',
-      advice: { low: 'Financial tasks getting delayed — cash flow at risk', high: 'Staying on top of finances' }
+      advice: { low: 'Financial tasks getting delayed', neglect: 'No finance tasks this week' }
     },
     {
       name: 'Growth', icon: '🌱', color: '#38bdf8',
       keywords: ['learn', 'read', 'course', 'study', 'book', 'research', 'build', 'app', 'skill', 'improve', 'practice'],
-      goal: 1, unit: 'task/week',
-      advice: { low: 'No personal growth this week — easy to skip', high: 'Investing in yourself this week' }
+      advice: { low: 'Growth is being crowded out', neglect: 'No personal growth this week' }
     },
     {
       name: 'Recharge', icon: '🎮', color: '#6b7280',
       keywords: ['game', 'video', 'play', 'rest', 'relax', 'netflix', 'movie', 'tv', 'break', 'vacation'],
-      goal: 1, unit: 'session/week',
-      advice: { low: 'No recharge logged this week', high: 'Getting some rest in — good balance' }
+      advice: { low: 'Running on empty — schedule some rest', neglect: 'No recharge logged this week' }
     },
   ];
 
-  // Score each category based on tasks added this week
+  // Distribution-based scoring — no goals needed
+  // Score reflects how balanced your attention is across life areas
   const allThisWeek = [...active, ...completed.filter(t => t.created_at >= weekAgoStr)];
+  const totalThisWeek = allThisWeek.length || 1;
+
   const lifeScores = lifeCategories.map(cat => {
     const matched = allThisWeek.filter(t => {
       const text = ((t.cleaned_task || t.content) + ' ' + (t.project || '')).toLowerCase();
       return cat.keywords.some(k => text.includes(k));
     });
-    const score = Math.min(matched.length, cat.goal);
-    const pct = Math.round((matched.length / cat.goal) * 100); // uncapped so overachievement flows into score
-    return { ...cat, score, pct, matched: matched.length };
+    const count = matched.length;
+    const pct = Math.round((count / totalThisWeek) * 100); // % of your week this area got
+    return { ...cat, count, pct, matched: count };
   });
   lastLifeScores = lifeScores;
 
-  // Score math: base caps each category at 100%, but overachievement earns overflow credits
-  // that can partially offset zeros (up to 15pts credit per zero category)
-  const basePcts = lifeScores.map(c => Math.min(c.pct, 100));
-  const baseAvg = basePcts.reduce((a,b) => a + b, 0) / lifeScores.length;
-  const totalOverflow = lifeScores.reduce((a,c) => a + Math.max(0, c.pct - 100), 0);
-  const zeroCount = lifeScores.filter(c => c.pct === 0).length;
-  const overflowCredit = Math.min(totalOverflow * 0.05, zeroCount * 10);
-  const avgLifeScore = Math.min(100, Math.round(baseAvg + overflowCredit));
+  // Balance score: penalize neglect (0%) and overconcentration (>50% of week in one area)
+  // Ideal: activity spread across 4+ categories, no category completely neglected
+  const activeCategories = lifeScores.filter(c => c.count > 0).length;
+  const maxShare = Math.max(...lifeScores.map(c => c.pct));
+  const neglectedCount = lifeScores.filter(c => c.count === 0).length;
+  
+  // Base: 100 points
+  // -8 per completely neglected category (max -40)
+  // -15 if one category dominates >60% of your week
+  // -8 if one category dominates >40% of your week
+  // +5 if 5+ categories have activity
+  const neglectPenalty = Math.min(40, neglectedCount * 8);
+  const concentrationPenalty = maxShare > 60 ? 15 : maxShare > 40 ? 8 : 0;
+  const breadthBonus = activeCategories >= 5 ? 5 : 0;
+  const avgLifeScore = Math.max(0, Math.min(100, 100 - neglectPenalty - concentrationPenalty + breadthBonus));
 
   el.innerHTML = `
     <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">Dashboard</div>
@@ -2241,23 +2244,21 @@ async function renderStats() {
         </div>
       </div>
       ${lifeScores.map((cat, idx) => `
-        <div onclick="showLifeDrilldown(${idx})" data-cat-idx="${idx}" style="margin-bottom:10px;cursor:pointer;border-radius:8px;padding:4px;transition:all 0.2s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div onclick="showLifeDrilldown(${idx})" style="margin-bottom:10px;cursor:pointer;border-radius:8px;padding:4px;transition:all 0.2s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="font-size:14px;">${cat.icon}</span>
               <span style="font-size:13px;font-weight:500;">${cat.name}</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:11px;color:var(--text2);">${cat.matched}/${cat.goal}</span>
-              <span style="font-size:11px;font-weight:700;color:${cat.pct > 100 ? 'white' : cat.pct === 100 ? cat.color : cat.pct >= 50 ? '#fbbf24' : '#ef4444'};">${cat.pct > 100 ? '🔥' : cat.pct === 100 ? '✓' : cat.pct >= 50 ? '~' : '!'}</span>
+              <span style="font-size:12px;font-weight:600;color:${cat.count === 0 ? 'var(--p1)' : 'var(--text2)'};">${cat.count} task${cat.count !== 1 ? 's' : ''}</span>
+              <span style="font-size:10px;color:var(--text2);opacity:0.6;">${cat.pct}%</span>
             </div>
           </div>
-          <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;position:relative;">
-            <div style="width:${Math.min(cat.pct,100)}%;height:100%;background:${cat.color};border-radius:4px;transition:width 0.5s;${cat.pct > 100 ? 'box-shadow:0 0 6px ' + cat.color + ';' : ''}"></div>
-            ${cat.pct > 100 ? '<div style="position:absolute;right:0;top:0;height:100%;width:3px;background:white;opacity:0.6;border-radius:2px;"></div>' : ''}
+          <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;">
+            <div style="width:${Math.min(cat.pct * 2, 100)}%;height:100%;background:${cat.count === 0 ? 'var(--border)' : cat.color};border-radius:4px;transition:width 0.5s;"></div>
           </div>
-          ${cat.pct > 100 ? '<div style="font-size:11px;margin-top:3px;padding-left:22px;color:' + cat.color + ';opacity:0.8;">+' + (cat.matched - cat.goal) + ' over goal — nice</div>' : ''}
-          ${cat.pct < 50 ? '<div style="font-size:11px;color:var(--text2);margin-top:3px;padding-left:22px;">' + cat.advice.low + '</div>' : ''}
+          ${cat.count === 0 ? '<div style="font-size:11px;color:var(--text2);margin-top:3px;padding-left:22px;opacity:0.7;">' + cat.advice.neglect + '</div>' : ''}
         </div>`).join('')}
     </div>
 

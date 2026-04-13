@@ -1388,7 +1388,6 @@ async function loadUserHats() {
     } else {
       userHats = HATS.map(p => ({ name: p.name, icon: p.icon, color: p.color }));
     }
-    renderHatBuckets();
   } catch(e) {
     userHats = HATS.map(p => ({ name: p.name, icon: p.icon, color: p.color }));
   }

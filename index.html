@@ -1475,7 +1475,7 @@ const DEFAULT_PROJECTS = [
 
 async function loadUserHats() {
   const badColors = new Set(['#ef4444','#f59e0b','#fbbf24','#10b981','#34d399','#fb923c','#f97316']);
-  const genericEmojis = new Set(['🚀','📁','💡','⚡','⭐','🌟','🔥','🎯','📌','🗂️','📂','🗃️','💼']);
+  const genericEmojis = new Set(['🚀','📁','💡','⚡','⭐','🌟','🔥','🎯','📌','🗂️','📂','🗃️']);
   try {
     const data = await sbFetch(`projects?user_id=eq.${currentUserId}&order=sort_order.asc`);
     if (data && data.length > 0) {
@@ -2917,39 +2917,62 @@ function renderObHats() {
 }
 
 async function assignHatPersonality(name) {
-  const apiKey = localStorage.getItem('apiKey') || document.getElementById('ob-apikey')?.value?.trim();
-  if (!apiKey || !name.trim()) {
-    // Fallback if no API key yet
-    const fallbackColors = ['#f472b6','#60a5fa','#22d3ee','#a78bfa','#38bdf8','#e879f9','#67e8f9'];
-    const fallbackIcons = ['📁','🎯','⚡','🌟','🔥','🎨','🛠️'];
-    const idx = Math.floor(Math.random() * fallbackColors.length);
-    return { icon: fallbackIcons[idx], color: fallbackColors[idx] };
+  const apiKey = localStorage.getItem('apiKey');
+  const nameLower = name.toLowerCase();
+
+  // Smart local fallback — contextual without needing API
+  const localMap = [
+    { keys: ['gne','dj','music','wedding','event','sound','audio','band'], icon: '🎧', color: '#e879f9' },
+    { keys: ['caliber','collision','auto','car','body','repair','shop'], icon: '🔧', color: '#60a5fa' },
+    { keys: ['serveants','serve','cpa','tax','accounting','bookkeep','nonprofit','treasurer'], icon: '📊', color: '#818cf8' },
+    { keys: ['app','dev','software','code','tech','build','product','startup'], icon: '💻', color: '#38bdf8' },
+    { keys: ['family','home','kids','child','parent','husband','wife','spouse','baby'], icon: '🏡', color: '#22d3ee' },
+    { keys: ['personal','me','self','life','journal'], icon: '✨', color: '#a78bfa' },
+    { keys: ['faith','church','ministry','worship','prayer','bible','spiritual'], icon: '🙏', color: '#c084fc' },
+    { keys: ['health','gym','fitness','workout','run','sport','wellness'], icon: '💪', color: '#67e8f9' },
+    { keys: ['finance','money','invest','budget','wealth','bank'], icon: '💰', color: '#a78bfa' },
+    { keys: ['school','study','learn','course','education','college'], icon: '📚', color: '#818cf8' },
+    { keys: ['work','job','career','office','corporate','business'], icon: '🏢', color: '#60a5fa' },
+    { keys: ['travel','trip','vacation','adventure'], icon: '✈️', color: '#38bdf8' },
+    { keys: ['creative','art','design','photo','video','content'], icon: '🎨', color: '#e879f9' },
+    { keys: ['volunteer','community','social','charity'], icon: '🤝', color: '#818cf8' },
+  ];
+
+  for (const entry of localMap) {
+    if (entry.keys.some(k => nameLower.includes(k))) {
+      return { icon: entry.icon, color: entry.color };
+    }
   }
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 60,
-        messages: [{ role: 'user', content: `For a life management app, assign an emoji and color for a project/role called "${name}". 
-Rules: 
-- Emoji must match the role's real-world vibe (e.g. DJ company → 🎧, accounting → 📊, parenting → 👨‍👩‍👧)
-- Color must be a hex code that fits the vibe but NEVER use red (#ef4444 range), amber/yellow (#f59e0b, #fbbf24 range), or green (#10b981, #34d399 range) — those are reserved for status indicators
+
+  // Try API if available
+  if (apiKey) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 60,
+          messages: [{ role: 'user', content: `For a life management app, assign an emoji and color for a project called "${name}".
+Rules:
+- Emoji must match the role's real-world vibe
+- Color must be a hex code — NEVER use red, amber/yellow, or green ranges (reserved for status)
 - Good colors: purples, blues, cyans, pinks, teals, indigos
-Respond ONLY in this format with nothing else:
+Respond ONLY:
 EMOJI: [single emoji]
 COLOR: [hex code]` }]
-      })
-    });
-    const data = await response.json();
-    const text = data.content?.[0]?.text || '';
-    const emoji = text.match(/EMOJI:\s*(.+)/)?.[1]?.trim();
-    const color = text.match(/COLOR:\s*(#[0-9a-fA-F]{6})/)?.[1]?.trim();
-    if (emoji && color) return { icon: emoji, color };
-  } catch(e) {}
-  // Fallback
-  return { icon: '📁', color: '#a78bfa' };
+        })
+      });
+      const data = await response.json();
+      const text = data.content?.[0]?.text || '';
+      const emoji = text.match(/EMOJI:\s*(.+)/)?.[1]?.trim();
+      const color = text.match(/COLOR:\s*(#[0-9a-fA-F]{6})/)?.[1]?.trim();
+      if (emoji && color) return { icon: emoji, color };
+    } catch(e) {}
+  }
+
+  // Final fallback
+  return { icon: '📋', color: '#a78bfa' };
 }
 
 function addObHat() {

@@ -1960,6 +1960,11 @@ function openHat(name) {
   document.getElementById('hatBuckets').style.display = 'none';
   document.getElementById('hatDetail').style.display = 'block';
 
+  // Hide capture card and explainer
+  document.querySelector('.capture-card').style.display = 'none';
+  const explainer = document.getElementById('aiExplainerCard');
+  if (explainer) explainer.style.display = 'none';
+
   // Swap header to hat mode
   document.querySelector('.logo').style.display = 'none';
   document.getElementById('hatDetailTitle').innerHTML = `${proj.icon} ${proj.name}`;
@@ -1973,6 +1978,14 @@ function closeHat() {
   currentHat = null;
   document.getElementById('hatDetail').style.display = 'none';
   document.getElementById('hatBuckets').style.display = 'block';
+
+  // Restore capture card
+  document.querySelector('.capture-card').style.display = 'block';
+  // Restore explainer if not dismissed
+  if (!localStorage.getItem('aiExplainerDismissed')) {
+    const explainer = document.getElementById('aiExplainerCard');
+    if (explainer) explainer.style.display = 'block';
+  }
 
   // Restore header
   document.querySelector('.logo').style.display = '';

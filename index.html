@@ -1474,19 +1474,27 @@ const DEFAULT_PROJECTS = [
 ];
 
 async function loadUserHats() {
-  const colorRemap = {
-    '#34d399': '#22d3ee', // Family green → cyan
-    'var(--personal)': 'var(--personal)', // already handled by CSS var
-  };
+  // Colors that conflict with status indicators — remap them
+  const badColors = new Set(['#ef4444','#f59e0b','#fbbf24','#10b981','#34d399','#fb923c','#f97316']);
   try {
     const data = await sbFetch(`projects?user_id=eq.${currentUserId}&order=sort_order.asc`);
     if (data && data.length > 0) {
       const seen = new Set();
-      userHats = data.filter(p => {
+      const hats = data.filter(p => {
         if (seen.has(p.name)) return false;
         seen.add(p.name);
         return true;
-      }).map(p => ({ ...p, color: colorRemap[p.color] || p.color }));
+      });
+      // Remap any bad colors via AI
+      userHats = await Promise.all(hats.map(async p => {
+        if (badColors.has(p.color?.toLowerCase())) {
+          const personality = await assignHatPersonality(p.name);
+          // Update in DB silently
+          sbFetch(`projects?id=eq.${p.id}`, 'PATCH', { icon: personality.icon, color: personality.color }).catch(() => {});
+          return { ...p, icon: personality.icon, color: personality.color };
+        }
+        return p;
+      }));
     } else {
       userHats = HATS.map(p => ({ name: p.name, icon: p.icon, color: p.color }));
     }

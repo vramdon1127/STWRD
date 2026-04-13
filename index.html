@@ -1563,17 +1563,39 @@ async function initApp(user) {
 }
 
 async function loadProfile(user) {
+  // Use direct fetch to bypass Supabase SDK (which hangs on Safari auth lock)
+  const sess = JSON.parse(localStorage.getItem('stwrd-auth') || '{}');
+  const token = sess?.access_token || SUPABASE_KEY;
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
   try {
-    const { data } = await sbClient.from('profiles').select('*').eq('id', user.id).single();
-    return data;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=*`, { headers });
+    if (res.ok) {
+      const rows = await res.json();
+      if (rows && rows.length > 0) return rows[0];
+    }
+    // No profile — create one
+    const createRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: { ...headers, 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        id: user.id,
+        full_name: user.user_metadata?.full_name,
+        avatar_url: user.user_metadata?.avatar_url,
+      }),
+    });
+    if (createRes.ok) {
+      const rows = await createRes.json();
+      return Array.isArray(rows) ? rows[0] : rows;
+    }
+    console.error('[STWRD] loadProfile create failed:', createRes.status, await createRes.text());
+    return null;
   } catch(e) {
-    // Create profile if doesn't exist
-    const { data } = await sbClient.from('profiles').insert({
-      id: user.id,
-      full_name: user.user_metadata?.full_name,
-      avatar_url: user.user_metadata?.avatar_url,
-    }).select().single();
-    return data;
+    console.error('[STWRD] loadProfile error:', e);
+    return null;
   }
 }
 
@@ -1676,10 +1698,10 @@ function setupRealtime() {
 
 // ─── SUPABASE HELPERS ─────────────────────────────────────────
 async function sbFetch(path, method = 'GET', body = null) {
-  // Get current session token for RLS
-  const { data: { session } } = await sbClient.auth.getSession();
-  const token = session?.access_token || SUPABASE_KEY;
-  
+  // Read token directly from localStorage — sbClient.auth.getSession() hangs on Safari
+  const sess = JSON.parse(localStorage.getItem('stwrd-auth') || '{}');
+  const token = sess?.access_token || SUPABASE_KEY;
+
   const opts = {
     method,
     headers: {

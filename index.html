@@ -2882,36 +2882,89 @@ function showOnboarding(user) {
   if (emailEl) emailEl.value = user.email || '';
   
   renderObHats(); // pre-render for step 4
+  // Assign AI personalities to default hats in background
+  setTimeout(async () => {
+    for (let i = 0; i < obHats.length; i++) {
+      const p = await assignHatPersonality(obHats[i].name);
+      obHats[i].icon = p.icon;
+      obHats[i].color = p.color;
+    }
+    renderObHats();
+  }, 500);
 }
 
 function renderObHats() {
   const el = document.getElementById('ob-hats-list');
   if (!el) return;
   el.innerHTML = obHats.map((p, i) => `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
-      <span style="font-size:20px;">${p.icon}</span>
-      <input value="${p.name}" onchange="obHats[${i}].name=this.value" style="flex:1;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;">
-      <div style="width:16px;height:16px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
+    <div style="background:var(--surface);border:1px solid ${p.loading ? 'var(--border)' : p.color + '40'};border-radius:12px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:all 0.3s;">
+      <span style="font-size:20px;">${p.loading ? '⏳' : p.icon}</span>
+      <input value="${p.name}" onchange="obHats[${i}].name=this.value" placeholder="Hat name..." style="flex:1;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;">
+      ${p.loading ? `<span style="font-size:11px;color:var(--text2);">AI picking...</span>` : `<div style="width:16px;height:16px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>`}
       <button onclick="removeObHat(${i})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:0;">×</button>
     </div>`).join('');
 }
 
+async function assignHatPersonality(name) {
+  const apiKey = localStorage.getItem('apiKey') || document.getElementById('ob-apikey')?.value?.trim();
+  if (!apiKey || !name.trim()) {
+    // Fallback if no API key yet
+    const fallbackColors = ['#f472b6','#60a5fa','#22d3ee','#a78bfa','#38bdf8','#e879f9','#67e8f9'];
+    const fallbackIcons = ['📁','🎯','⚡','🌟','🔥','🎨','🛠️'];
+    const idx = Math.floor(Math.random() * fallbackColors.length);
+    return { icon: fallbackIcons[idx], color: fallbackColors[idx] };
+  }
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 60,
+        messages: [{ role: 'user', content: `For a life management app, assign an emoji and color for a project/role called "${name}". 
+Rules: 
+- Emoji must match the role's real-world vibe (e.g. DJ company → 🎧, accounting → 📊, parenting → 👨‍👩‍👧)
+- Color must be a hex code that fits the vibe but NEVER use red (#ef4444 range), amber/yellow (#f59e0b, #fbbf24 range), or green (#10b981, #34d399 range) — those are reserved for status indicators
+- Good colors: purples, blues, cyans, pinks, teals, indigos
+Respond ONLY in this format with nothing else:
+EMOJI: [single emoji]
+COLOR: [hex code]` }]
+      })
+    });
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '';
+    const emoji = text.match(/EMOJI:\s*(.+)/)?.[1]?.trim();
+    const color = text.match(/COLOR:\s*(#[0-9a-fA-F]{6})/)?.[1]?.trim();
+    if (emoji && color) return { icon: emoji, color };
+  } catch(e) {}
+  // Fallback
+  return { icon: '📁', color: '#a78bfa' };
+}
+
 function addObHat() {
-  const colors = ['#f472b6','#60a5fa','#22d3ee','#fb923c','#a78bfa','#fbbf24','#38bdf8'];
-  const icons = ['📁','🎯','🚀','⚡','🌟','💡','🔥'];
-  obHats.push({ 
-    name: '', 
-    icon: icons[obHats.length % icons.length], 
-    color: colors[obHats.length % colors.length] 
-  });
+  const placeholder = { name: '', icon: '⏳', color: '#2a2a3d', loading: true };
+  obHats.push(placeholder);
+  const idx = obHats.length - 1;
   renderObHats();
-  // Focus the last input after render
+
+  // Focus the last input
   setTimeout(() => {
     const inputs = document.querySelectorAll('#ob-hats-list input[type="text"], #ob-hats-list input:not([type])');
     const lastInput = inputs[inputs.length - 1];
     if (lastInput) {
       lastInput.focus();
-      lastInput.select();
+      // On blur, assign personality based on name
+      lastInput.addEventListener('blur', async function onBlur() {
+        lastInput.removeEventListener('blur', onBlur);
+        const name = lastInput.value.trim();
+        if (!name) return;
+        obHats[idx].name = name;
+        const personality = await assignHatPersonality(name);
+        obHats[idx].icon = personality.icon;
+        obHats[idx].color = personality.color;
+        obHats[idx].loading = false;
+        renderObHats();
+      });
     }
   }, 50);
 }

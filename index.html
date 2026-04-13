@@ -3423,6 +3423,8 @@ async function resetJourney() {
     showToast('❌ Could not reset: ' + e.message);
   }
 }
+
+function dismissAiExplainer() {
   document.getElementById('aiExplainerCard').style.display = 'none';
   localStorage.setItem('aiExplainerDismissed', 'true');
 }

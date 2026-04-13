@@ -3459,6 +3459,8 @@ async function updateLifeGoal(catId, newGoal) {
     showToast('❌ Could not save: ' + e.message);
   }
 }
+
+function dismissAiExplainer() {
   document.getElementById('aiExplainerCard').style.display = 'none';
   localStorage.setItem('aiExplainerDismissed', 'true');
 }

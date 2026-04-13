@@ -711,8 +711,8 @@
 </div>
 
 <!-- ONBOARDING SCREEN -->
-<div id="onboardingScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;overflow-y:auto;overflow-x:hidden;">
-  <div style="max-width:500px;margin:0 auto;padding:40px 24px 120px;min-height:100vh;">
+<div id="onboardingScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;overflow:hidden;">
+  <div id="onboardingScroll" style="max-width:500px;margin:0 auto;padding:40px 24px 120px;height:100vh;overflow-y:auto;overflow-x:hidden;background:var(--bg);">
     
     <!-- Step indicator -->
     <div style="display:flex;gap:4px;margin-bottom:40px;" id="onboardingSteps">
@@ -2969,7 +2969,7 @@ function obNext(step) {
   document.getElementById(`step-dot-${step}`).classList.remove('active');
   document.getElementById(`step-dot-${step}`).classList.add('done');
   document.getElementById(`step-dot-${step + 1}`).classList.add('active');
-  const screen = document.getElementById('onboardingScreen');
+  const screen = document.getElementById('onboardingScroll') || document.getElementById('onboardingScreen');
   screen.scrollTop = 0;
   if (step + 1 === 4) renderObHats();
   if (step + 1 === 5) renderObMetrics();
@@ -2981,7 +2981,7 @@ function obBack(step) {
   document.getElementById(`step-dot-${step}`).classList.remove('active');
   document.getElementById(`step-dot-${step - 1}`).classList.remove('done');
   document.getElementById(`step-dot-${step - 1}`).classList.add('active');
-  document.getElementById('onboardingScreen').scrollTop = 0;
+  (document.getElementById('onboardingScroll') || document.getElementById('onboardingScreen')).scrollTop = 0;
 }
 
 async function completeOnboarding() {

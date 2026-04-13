@@ -2154,43 +2154,50 @@ async function renderStats() {
   const teamCount = active.filter(t => t.added_by !== currentUser && t.added_by).length;
 
   // ── LIFE BALANCE SCORING ──────────────────────────────────
-  const lifeCategories = [
-    {
-      name: 'Work', icon: '💼', color: '#60a5fa',
-      keywords: ['work', 'invoice', 'client', 'meeting', 'email', 'caliber', 'gne', 'sox', 'audit', 'serveants', 'tax', 'honeybook', 'vibo', 'booking'],
-      advice: { low: 'Work tasks are piling up — focus time needed', neglect: 'No work tasks this week' }
-    },
-    {
-      name: 'Family', icon: '🏠', color: '#22d3ee',
-      keywords: ['family', 'mia', 'baby', 'home', 'house', 'birthday', 'gift', 'party', 'nursery', 'paint', 'mattress', 'depot', 'crue', 'jada', 'selah'],
-      advice: { low: 'Family is getting sidelined', neglect: 'No family tasks this week' }
-    },
-    {
-      name: 'Health', icon: '💪', color: '#fb923c',
-      keywords: ['health', 'workout', 'gym', 'exercise', 'run', 'walk', 'doctor', 'sleep', 'eat', 'diet', 'mental', 'meditat'],
-      advice: { low: 'Health is getting squeezed out', neglect: 'No health tasks this week — easy to skip' }
-    },
-    {
-      name: 'Faith', icon: '🙏', color: '#a78bfa',
-      keywords: ['faith', 'church', 'pray', 'devotion', 'bible', 'worship', 'sermon', 'ministry', 'god', 'spiritual'],
-      advice: { low: "Faith is light this week", neglect: "Faith hasn't shown up in your tasks" }
-    },
-    {
-      name: 'Finance', icon: '💰', color: '#fbbf24',
-      keywords: ['finance', 'invoice', 'payment', 'bill', 'budget', 'tax', 'money', 'zelle', 'deposit', 'proconnect', 'plaid'],
-      advice: { low: 'Financial tasks getting delayed', neglect: 'No finance tasks this week' }
-    },
-    {
-      name: 'Growth', icon: '🌱', color: '#38bdf8',
-      keywords: ['growth', 'learn', 'read', 'course', 'study', 'book', 'research', 'build', 'app', 'skill', 'improve', 'practice'],
-      advice: { low: 'Growth is being crowded out', neglect: 'No personal growth this week' }
-    },
-    {
-      name: 'Recharge', icon: '🎮', color: '#6b7280',
-      keywords: ['recharge', 'game', 'video', 'play', 'rest', 'relax', 'netflix', 'movie', 'tv', 'break', 'vacation'],
-      advice: { low: 'Running on empty — schedule some rest', neglect: 'No recharge logged this week' }
-    },
+  // Build from user's actual life categories — no hardcoded data
+  const categoryColors = {
+    work: '#60a5fa', family: '#22d3ee', health: '#fb923c', faith: '#a78bfa',
+    finance: '#fbbf24', growth: '#38bdf8', recharge: '#6b7280', personal: '#a78bfa',
+  };
+  const categoryAdvice = {
+    work:     { neglect: 'No work tasks this week' },
+    family:   { neglect: 'No family tasks this week' },
+    health:   { neglect: 'No health tasks this week — easy to skip' },
+    faith:    { neglect: "Faith hasn't shown up in your tasks" },
+    finance:  { neglect: 'No finance tasks this week' },
+    growth:   { neglect: 'No personal growth this week' },
+    recharge: { neglect: 'No recharge logged this week' },
+  };
+
+  // Use user's actual categories from DB, fall back to generic defaults
+  const baseCats = userLifeCategories.length > 0 ? userLifeCategories : [
+    { name: 'Work', icon: '💼', color: '#60a5fa', keywords: ['work','meeting','email','client','invoice','project'] },
+    { name: 'Family', icon: '🏠', color: '#22d3ee', keywords: ['family','home','kids','spouse','partner','baby'] },
+    { name: 'Health', icon: '💪', color: '#fb923c', keywords: ['health','workout','gym','exercise','doctor','run'] },
+    { name: 'Faith', icon: '🙏', color: '#a78bfa', keywords: ['faith','church','pray','devotion','bible','worship'] },
+    { name: 'Finance', icon: '💰', color: '#fbbf24', keywords: ['finance','money','bill','budget','payment','tax'] },
+    { name: 'Growth', icon: '🌱', color: '#38bdf8', keywords: ['growth','learn','read','course','study','skill'] },
+    { name: 'Recharge', icon: '🎮', color: '#6b7280', keywords: ['recharge','rest','relax','game','movie','vacation'] },
   ];
+
+  // For each category, build keywords from:
+  // 1. Category name itself (lowercase)
+  // 2. User's stored keywords
+  // 3. Any hat names that semantically match
+  const hatNames = userHats.map(h => h.name.toLowerCase());
+  const lifeCategories = baseCats.map(cat => {
+    const nameKey = cat.name.toLowerCase();
+    const storedKeywords = Array.isArray(cat.keywords) ? cat.keywords.map(k => k.toLowerCase()) : [];
+    // Add matching hat names as keywords (e.g. if user has "GNE" hat and "Work" category)
+    const matchingHats = hatNames.filter(h =>
+      storedKeywords.some(k => h.includes(k) || k.includes(h)) || h === nameKey
+    );
+    const allKeywords = [...new Set([nameKey, ...storedKeywords, ...matchingHats])];
+    const key = nameKey.split(' ')[0];
+    const advice = categoryAdvice[key] || { neglect: `No ${cat.name} tasks this week` };
+    const color = cat.color || categoryColors[key] || 'var(--accent)';
+    return { ...cat, color, keywords: allKeywords, advice };
+  });
 
   // Distribution-based scoring — no goals needed
   // Score reflects how balanced your attention is across life areas
@@ -2405,8 +2412,8 @@ Today: ${today}
 Completion rate this week: ${completionRate}%
 Completed this week: ${completedThisWeek}
 
-Life balance this week (0-100% of weekly goal):
-${(lifeScores||[]).map(c => c.name + ': ' + c.pct + '% (' + c.matched + '/' + c.goal + ' tasks)').join(', ')}
+Life balance this week (% of tasks in each area):
+${(lifeScores||[]).map(c => c.name + ': ' + c.pct + '% (' + c.count + ' tasks)').join(', ')}
 
 Give exactly 3 insights — mix task productivity AND life balance. Be specific, mention actual task names, be direct and warm:
 INSIGHT1_EMOJI: [emoji]
@@ -2889,37 +2896,38 @@ async function saveWeeklySnapshot() {
     const addedCount = active.length + completedCount;
     const completionRate = addedCount > 0 ? Math.round((completedCount / addedCount) * 100) : 0;
 
-    const projCounts = {
-      gne: active.filter(t => t.project === 'GNE').length,
-      caliber: active.filter(t => t.project === 'Caliber').length,
-      personal: active.filter(t => t.project === 'Personal').length,
-      serveants: active.filter(t => t.project === 'ServeAnts').length,
-    };
+    const projCounts = {};
+    userHats.forEach(h => {
+      projCounts[h.name.toLowerCase()] = active.filter(t => t.project === h.name).length;
+    });
 
-    // Life balance scores
-    const lifeCategories = [
-      { name: 'Work', keywords: ['invoice','client','meeting','email','caliber','gne','sox','audit','serveants','tax','honeybook','vibo','booking'], goal: 5 },
-      { name: 'Family', keywords: ['mia','baby','home','house','birthday','gift','party','nursery','paint','mattress','depot','crue','jada'], goal: 2 },
-      { name: 'Health', keywords: ['workout','gym','exercise','run','walk','doctor','sleep','eat','diet','health','mental','meditat'], goal: 3 },
-      { name: 'Faith', keywords: ['church','pray','devotion','bible','worship','faith','sermon','ministry','god','spiritual'], goal: 1 },
-      { name: 'Personal Finance', keywords: ['budget','debt','savings','mortgage','rent','groceries','bills','credit card','paycheck','emergency fund','insurance','loan'], goal: 2 },
-      { name: 'Growth', keywords: ['learn','read','course','study','book','research','build','app','skill','improve','practice'], goal: 1 },
-      { name: 'Recharge', keywords: ['game','video','play','rest','relax','netflix','movie','tv','break','vacation'], goal: 1 },
+    // Life balance scores — use user's actual categories
+    const snapCats = userLifeCategories.length > 0 ? userLifeCategories : [
+      { name: 'Work', keywords: ['work','meeting','email','client','invoice','project'] },
+      { name: 'Family', keywords: ['family','home','kids','spouse','partner','baby'] },
+      { name: 'Health', keywords: ['health','workout','gym','exercise','doctor','run'] },
+      { name: 'Faith', keywords: ['faith','church','pray','devotion','bible','worship'] },
+      { name: 'Finance', keywords: ['finance','money','bill','budget','payment','tax'] },
+      { name: 'Growth', keywords: ['growth','learn','read','course','study','skill'] },
+      { name: 'Recharge', keywords: ['recharge','rest','relax','game','movie','vacation'] },
     ];
 
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekAgoStr = weekAgo.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
     const allThisWeek = [...active, ...completed.filter(t => t.created_at >= weekAgoStr)];
+    const snapTotal = allThisWeek.length || 1;
 
     const lifeScores = {};
-    lifeCategories.forEach(cat => {
+    snapCats.forEach(cat => {
+      const nameKey = cat.name.toLowerCase();
+      const keywords = Array.isArray(cat.keywords) ? cat.keywords.map(k => k.toLowerCase()) : [nameKey];
+      const allKeys = [...new Set([nameKey, ...keywords])];
       const matched = allThisWeek.filter(t => {
         const text = ((t.cleaned_task || t.content) + ' ' + (t.project || '')).toLowerCase();
-        return cat.keywords.some(k => text.includes(k));
+        return allKeys.some(k => text.includes(k));
       }).length;
-      const pct = Math.round((matched / cat.goal) * 100);
-      lifeScores[cat.name.toLowerCase()] = Math.min(pct, 200); // cap at 200%
+      lifeScores[nameKey] = Math.round((matched / snapTotal) * 100);
     });
 
     const basePcts = Object.values(lifeScores).map(p => Math.min(p, 100));
@@ -2928,6 +2936,18 @@ async function saveWeeklySnapshot() {
     const zeroCount = Object.values(lifeScores).filter(p => p === 0).length;
     const overflowCredit = Math.min(totalOverflow * 0.05, zeroCount * 10);
     const lifeScore = Math.min(100, Math.round(baseAvg + overflowCredit));
+
+    // Build dynamic project counts from user's actual hats
+    const projSnapshot = {};
+    userHats.forEach(h => {
+      projSnapshot[`proj_${h.name.toLowerCase().replace(/\s+/g,'_')}`] = active.filter(t => t.project === h.name).length;
+    });
+
+    // Build dynamic life scores from user's actual categories
+    const lifeSnapshot = {};
+    Object.entries(lifeScores).forEach(([key, val]) => {
+      lifeSnapshot[`life_${key.split(' ')[0].toLowerCase()}`] = val || 0;
+    });
 
     await sbFetch('snapshots', 'POST', {
       user_id: currentUserId,
@@ -2938,17 +2958,8 @@ async function saveWeeklySnapshot() {
       active_tasks: total,
       completed_tasks: completedCount,
       p1_tasks: p1,
-      proj_gne: projCounts.gne,
-      proj_caliber: projCounts.caliber,
-      proj_personal: projCounts.personal,
-      proj_serveants: projCounts.serveants,
-      life_work: lifeScores['work'] || 0,
-      life_family: lifeScores['family'] || 0,
-      life_health: lifeScores['health'] || 0,
-      life_faith: lifeScores['faith'] || 0,
-      life_finance: lifeScores['finance'] || 0,
-      life_growth: lifeScores['growth'] || 0,
-      life_recharge: lifeScores['recharge'] || 0,
+      ...projSnapshot,
+      ...lifeSnapshot,
     });
     console.log('STWRD: Weekly snapshot saved for', weekStart);
   } catch(e) {
@@ -3036,15 +3047,22 @@ async function renderProgress() {
     return `${x},${y}`;
   }).join(' ');
 
-  const lifeCategories = [
-    { key: 'life_work', name: 'Work', color: '#60a5fa', icon: '💼' },
-    { key: 'life_family', name: 'Family', color: '#22d3ee', icon: '🏠' },
-    { key: 'life_health', name: 'Health', color: '#fb923c', icon: '💪' },
-    { key: 'life_faith', name: 'Faith', color: '#a78bfa', icon: '🙏' },
-    { key: 'life_finance', name: 'Personal Finance', color: '#fbbf24', icon: '💰' },
-    { key: 'life_growth', name: 'Growth', color: '#38bdf8', icon: '🌱' },
-    { key: 'life_recharge', name: 'Recharge', color: '#6b7280', icon: '🎮' },
-  ];
+  const lifeCategories = userLifeCategories.length > 0
+    ? userLifeCategories.map(c => ({
+        key: 'life_' + c.name.split(' ')[0].toLowerCase(),
+        name: c.name,
+        color: c.color || '#60a5fa',
+        icon: c.icon || '⚖️'
+      }))
+    : [
+        { key: 'life_work', name: 'Work', color: '#60a5fa', icon: '💼' },
+        { key: 'life_family', name: 'Family', color: '#22d3ee', icon: '🏠' },
+        { key: 'life_health', name: 'Health', color: '#fb923c', icon: '💪' },
+        { key: 'life_faith', name: 'Faith', color: '#a78bfa', icon: '🙏' },
+        { key: 'life_finance', name: 'Finance', color: '#fbbf24', icon: '💰' },
+        { key: 'life_growth', name: 'Growth', color: '#38bdf8', icon: '🌱' },
+        { key: 'life_recharge', name: 'Recharge', color: '#6b7280', icon: '🎮' },
+      ];
 
   el.innerHTML = `
     <!-- HEADER STATS -->

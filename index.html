@@ -2663,7 +2663,7 @@ function showLifeDrilldown(idx) {
   const cat = lastLifeScores[idx];
   if (!cat) return;
   showDrilldown(cat.name + ' Tasks', t => {
-    const text = (t.cleaned_task || t.content || '').toLowerCase();
+    const text = ((t.cleaned_task || t.content || '') + ' ' + (t.project || '')).toLowerCase();
     return cat.keywords.some(k => text.includes(k));
   });
 }

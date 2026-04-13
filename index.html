@@ -1556,25 +1556,34 @@ async function loadUserHats() {
     const data = await sbFetch(`projects?user_id=eq.${currentUserId}&order=sort_order.asc`);
     if (data && data.length > 0) {
       const seen = new Set();
-      const hats = data.filter(p => {
+      userHats = data.filter(p => {
         if (seen.has(p.name)) return false;
         seen.add(p.name);
         return true;
       });
-      userHats = await Promise.all(hats.map(async p => {
-        const needsColor = badColors.has(p.color?.toLowerCase());
-        const needsEmoji = genericEmojis.has(p.icon);
-        if (needsColor || needsEmoji) {
-          const personality = await assignHatPersonality(p.name);
-          const updated = {
-            icon: personality.icon,
-            color: needsColor ? personality.color : p.color
-          };
-          sbFetch(`projects?id=eq.${p.id}`, 'PATCH', updated).catch(() => {});
-          return { ...p, ...updated };
+      // Fire AI reassignment in background — don't block task loading
+      setTimeout(async () => {
+        let updated = false;
+        for (let i = 0; i < userHats.length; i++) {
+          const p = userHats[i];
+          const needsColor = badColors.has(p.color?.toLowerCase());
+          const needsEmoji = genericEmojis.has(p.icon);
+          if (needsColor || needsEmoji) {
+            const personality = await assignHatPersonality(p.name);
+            const patch = {
+              icon: personality.icon,
+              color: needsColor ? personality.color : p.color
+            };
+            sbFetch(`projects?id=eq.${p.id}`, 'PATCH', patch).catch(() => {});
+            userHats[i] = { ...p, ...patch };
+            updated = true;
+          }
         }
-        return p;
-      }));
+        if (updated) {
+          populateHatSelectors();
+          renderHatBuckets();
+        }
+      }, 100);
     } else {
       userHats = HATS.map(p => ({ name: p.name, icon: p.icon, color: p.color }));
     }

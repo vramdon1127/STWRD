@@ -3415,7 +3415,7 @@ function resetCopyBtn() {
 async function resetJourney() {
   if (!confirm('Reset your 30-day journey? This clears your snapshot history and starts fresh from today. Your tasks won\'t be affected.')) return;
   try {
-    await sbFetch(`weekly_snapshots?user_id=eq.${currentUserId}`, 'DELETE');
+    await sbFetch(`snapshots?user_id=eq.${currentUserId}`, 'DELETE');
     showToast('✓ Journey reset — starting fresh from today');
     setTimeout(() => saveWeeklySnapshot(), 500);
     if (document.getElementById('view-progress').classList.contains('active')) renderProgress();

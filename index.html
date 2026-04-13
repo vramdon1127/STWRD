@@ -1122,7 +1122,10 @@
 
   <!-- PROGRESS VIEW -->
   <div class="view" id="view-progress">
-    <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">30-Day Journey</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">30-Day Journey</div>
+      <button onclick="resetJourney()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--p1)';this.style.color='var(--p1)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">↺ Reset</button>
+    </div>
     <div style="color:var(--text2);font-size:13px;margin-bottom:20px;">Tracking your stewardship over time</div>
     <div id="progressContent">
       <div style="text-align:center;padding:40px;color:var(--text2);">
@@ -1185,14 +1188,6 @@
           Analyze My Tasks
         </button>
         <div id="refineResult" style="margin-top:12px;width:100%;"></div>
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
-        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">📈 Journey</div>
-        <div class="settings-value" style="margin-bottom:12px;">Reset your 30-day journey to start fresh from today. Your tasks won't be affected.</div>
-        <button onclick="resetJourney()" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--p1)';this.style.color='var(--p1)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">Reset 30-Day Journey</button>
       </div>
     </div>
 

@@ -1195,6 +1195,15 @@
     </div>
     <div class="settings-section">
       <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
+        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">⚖️ Life Areas</div>
+        <div class="settings-value" style="margin-bottom:12px;">Customize the areas that make up your Life Score. Add, rename, or remove areas to match your life.</div>
+        <div id="lifeAreasEditor" style="width:100%;margin-bottom:12px;"></div>
+        <button onclick="addLifeArea()" style="width:100%;padding:11px;border-radius:10px;border:1px dashed var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">+ Add Life Area</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
         <div class="settings-label" style="font-weight:600;margin-bottom:4px;">🧠 Life Balance Keywords</div>
         <div class="settings-value" style="margin-bottom:12px;">These keywords tell STWRD which life area each task belongs to. Your hat names are matched automatically. Edit to fine-tune.</div>
         <div id="keywordEditor" style="width:100%;margin-bottom:12px;"></div>
@@ -1387,7 +1396,8 @@ window.addEventListener('load', async () => {
 // Handle auth state changes
 sbClient.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session) {
-    window.location.hash = '';
+    // Replace history so swipe-back doesn't return to login screen
+    window.history.replaceState(null, '', window.location.pathname);
     await initApp(session.user);
   } else if (event === 'SIGNED_OUT') {
     showAuthScreen();
@@ -2511,7 +2521,7 @@ function showView(name) {
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'stats') renderStats();
   if (name === 'progress') renderProgress();
-  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); renderKeywordEditor(); }
+  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); renderKeywordEditor(); renderLifeAreasEditor(); }
   if (name === 'today') renderToday();
 }
 
@@ -3591,6 +3601,130 @@ async function updateLifeGoal(catId, newGoal) {
   } catch(e) {
     showToast('❌ Could not save: ' + e.message);
   }
+}
+
+function renderLifeAreasEditor() {
+  const el = document.getElementById('lifeAreasEditor');
+  if (!el) return;
+  if (!userLifeCategories.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text2);">No life areas yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = userLifeCategories.map(cat => `
+    <div id="la-row-${cat.id}" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+      <span style="font-size:18px;cursor:pointer;" onclick="pickLifeAreaIcon('${cat.id}')" title="Tap to change icon">${cat.icon || '⚖️'}</span>
+      <input type="text" value="${cat.name}"
+        id="la-name-${cat.id}"
+        style="flex:1;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;outline:none;"
+        onblur="saveLifeAreaName('${cat.id}', this.value)"
+        onkeydown="if(event.key==='Enter') this.blur()">
+      <button onclick="deleteLifeArea('${cat.id}', '${cat.name}')"
+        style="background:none;border:none;cursor:pointer;color:var(--text2);padding:4px;border-radius:6px;transition:color 0.2s;"
+        onmouseover="this.style.color='var(--p1)'" onmouseout="this.style.color='var(--text2)'"
+        title="Remove area">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+async function saveLifeAreaName(catId, newName) {
+  newName = newName.trim();
+  if (!newName) return;
+  const cat = userLifeCategories.find(c => c.id === catId);
+  if (!cat || cat.name === newName) return;
+  cat.name = newName;
+  try {
+    await sbClient.from('life_categories').update({ name: newName }).eq('id', catId).eq('user_id', currentUserId);
+    showToast(`✓ Renamed to ${newName}`);
+    renderLifeAreasEditor();
+    renderKeywordEditor();
+  } catch(e) { showToast('❌ Could not rename'); }
+}
+
+async function deleteLifeArea(catId, name) {
+  if (!confirm(`Remove "${name}" from your life areas?`)) return;
+  try {
+    await sbClient.from('life_categories').delete().eq('id', catId).eq('user_id', currentUserId);
+    userLifeCategories = userLifeCategories.filter(c => c.id !== catId);
+    showToast(`✓ ${name} removed`);
+    renderLifeAreasEditor();
+    renderKeywordEditor();
+  } catch(e) { showToast('❌ Could not remove'); }
+}
+
+async function addLifeArea() {
+  const icons = ['⭐','🏋️','🎯','💡','🌍','🎨','🤝','🏡','📖','🧘','🎵','🚀','💬','🛠️','🌿'];
+  const icon = icons[Math.floor(Math.random() * icons.length)];
+  const name = 'New Area';
+  try {
+    const { data, error } = await sbClient.from('life_categories').insert({
+      user_id: currentUserId,
+      name,
+      icon,
+      color: '#7c6fef',
+      goal: 2,
+      keywords: [],
+      active: true,
+      sort_order: userLifeCategories.length + 1
+    }).select().single();
+    if (error) throw error;
+    userLifeCategories.push(data);
+    renderLifeAreasEditor();
+    renderKeywordEditor();
+    // Focus the new name input
+    setTimeout(() => {
+      const input = document.getElementById(`la-name-${data.id}`);
+      if (input) { input.select(); input.focus(); }
+    }, 100);
+    showToast('✓ New area added — tap to rename');
+  } catch(e) { showToast('❌ Could not add area'); }
+}
+
+function pickLifeAreaIcon(catId) {
+  const icons = ['💼','🏠','💪','🙏','💰','🌱','🎮','❤️','📚','🎯','🌍','🎨','🤝','🧘','🎵','🚀','⭐','🛠️','🌿','💡'];
+  const picker = document.createElement('div');
+  picker.id = 'icon-picker';
+  picker.style.cssText = `position:fixed;z-index:999;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-wrap:wrap;gap:8px;max-width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.4);`;
+  // Position near the icon
+  const row = document.getElementById(`la-row-${catId}`);
+  if (row) {
+    const rect = row.getBoundingClientRect();
+    picker.style.top = (rect.bottom + 8) + 'px';
+    picker.style.left = rect.left + 'px';
+  } else {
+    picker.style.top = '50%';
+    picker.style.left = '50%';
+    picker.style.transform = 'translate(-50%,-50%)';
+  }
+  icons.forEach(ic => {
+    const btn = document.createElement('button');
+    btn.textContent = ic;
+    btn.style.cssText = 'font-size:22px;background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;transition:background 0.1s;';
+    btn.onmouseover = () => btn.style.background = 'var(--surface2)';
+    btn.onmouseout = () => btn.style.background = 'none';
+    btn.onclick = async () => {
+      document.body.removeChild(picker);
+      const cat = userLifeCategories.find(c => c.id === catId);
+      if (!cat) return;
+      cat.icon = ic;
+      try {
+        await sbClient.from('life_categories').update({ icon: ic }).eq('id', catId).eq('user_id', currentUserId);
+        renderLifeAreasEditor();
+        showToast(`✓ Icon updated`);
+      } catch(e) { showToast('❌ Could not update icon'); }
+    };
+    picker.appendChild(btn);
+  });
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closePicker(e) {
+      if (!picker.contains(e.target)) {
+        if (document.body.contains(picker)) document.body.removeChild(picker);
+        document.removeEventListener('click', closePicker);
+      }
+    });
+  }, 100);
+  document.body.appendChild(picker);
 }
 
 function renderKeywordEditor() {

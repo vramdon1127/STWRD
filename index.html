@@ -911,8 +911,17 @@
 </div>
 
 <header style="display:none;">
+  <!-- Normal logo -->
   <div class="logo" onclick="showView('capture')" style="cursor:pointer;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>STWRD</div>
+  <!-- Hat nav — shown when inside a hat -->
+  <div id="headerHatNav" style="display:none;align-items:center;gap:10px;">
+    <button onclick="closeHat()" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:7px 14px;color:var(--text);cursor:pointer;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+    <div id="hatDetailTitle" style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;"></div>
+  </div>
   <div style="display:flex;align-items:center;gap:8px;">
     <!-- Partner pill — distinct accent style -->
     <button id="partnerIconBtn" onclick="togglePartnerPanel()" style="display:flex;align-items:center;gap:6px;background:rgba(124,111,239,0.15);border:1px solid var(--accent);border-radius:20px;padding:6px 12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(124,111,239,0.25)'" onmouseout="this.style.background=partnerData?'rgba(52,211,153,0.15)':'rgba(124,111,239,0.15)'">
@@ -1041,16 +1050,6 @@
 
     <!-- PROJECT DETAIL VIEW -->
     <div id="hatDetail" style="display:none;">
-      <!-- Sticky nav -->
-      <div style="position:sticky;top:0;z-index:50;background:var(--bg);padding:12px 0 10px;margin-bottom:12px;border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <button onclick="closeHat()" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 16px;color:var(--text);cursor:pointer;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-            Back
-          </button>
-          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;" id="hatDetailTitle"></div>
-        </div>
-      </div>
       <div class="filter-bar" id="hatFilterBar">
         <button class="filter-chip active" onclick="setHatFilter('all',this)">All</button>
         <button class="filter-chip" onclick="setHatFilter('AI Complete',this)">🤖 AI Complete</button>
@@ -1960,7 +1959,13 @@ function openHat(name) {
   const proj = userHats.find(p => p.name === name) || PROJECTS.find(p => p.name === name) || { name, icon: '📋' };
   document.getElementById('hatBuckets').style.display = 'none';
   document.getElementById('hatDetail').style.display = 'block';
+
+  // Swap header to hat mode
+  document.querySelector('.logo').style.display = 'none';
   document.getElementById('hatDetailTitle').innerHTML = `${proj.icon} ${proj.name}`;
+  const headerHatNav = document.getElementById('headerHatNav');
+  if (headerHatNav) headerHatNav.style.display = 'flex';
+
   renderHatTasks();
 }
 
@@ -1968,6 +1973,12 @@ function closeHat() {
   currentHat = null;
   document.getElementById('hatDetail').style.display = 'none';
   document.getElementById('hatBuckets').style.display = 'block';
+
+  // Restore header
+  document.querySelector('.logo').style.display = '';
+  const headerHatNav = document.getElementById('headerHatNav');
+  if (headerHatNav) headerHatNav.style.display = 'none';
+
   renderHatBuckets();
 }
 

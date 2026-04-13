@@ -2941,21 +2941,28 @@ function updateApiInstructions() {
 
 function copyAiPrompt() {
   const text = '"Summarize what you know about my life, work, family, and goals in 3-4 sentences."';
+  const btn = document.querySelector('[onclick="copyAiPrompt()"]');
   navigator.clipboard.writeText(text).then(() => {
-    const btn = document.querySelector('[onclick="copyAiPrompt()"]');
     if (btn) {
-      const original = btn.innerHTML;
       btn.innerHTML = '✓ Copied!';
       btn.style.color = 'var(--personal)';
       btn.style.borderColor = 'var(--personal)';
-      setTimeout(() => {
-        btn.innerHTML = original;
-        btn.style.color = '';
-        btn.style.borderColor = '';
-      }, 2000);
     }
   });
 }
+
+function resetCopyBtn() {
+  const btn = document.querySelector('[onclick="copyAiPrompt()"]');
+  if (btn) {
+    btn.innerHTML = '📋 Copy prompt';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') resetCopyBtn();
+});
 
 function obNext(step) {
   if (step === 1) {
@@ -2985,6 +2992,7 @@ function obBack(step) {
   document.getElementById(`step-dot-${step - 1}`).classList.remove('done');
   document.getElementById(`step-dot-${step - 1}`).classList.add('active');
   document.getElementById('onboardingScreen').scrollTop = 0;
+  if (step - 1 === 3) resetCopyBtn();
 }
 
 async function completeOnboarding() {

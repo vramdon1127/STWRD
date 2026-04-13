@@ -1534,6 +1534,10 @@ sbClient.auth.onAuthStateChange(async (event, session) => {
 });
 
 async function initApp(user) {
+  // Hide splash as soon as we're past auth — we may take a moment loading data
+  const splash = document.getElementById('initialSplash');
+  if (splash) splash.style.display = 'none';
+
   currentUserId = user.id;
   currentUser = user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'Me';
   
@@ -3427,6 +3431,8 @@ let obHats = [...OB_DEFAULT_HATS];
 let obMetrics = [...OB_DEFAULT_METRICS];
 
 function showOnboarding(user) {
+  const splash = document.getElementById('initialSplash');
+  if (splash) splash.style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('onboardingScreen').style.display = 'block';
   document.querySelector('header').style.display = 'none';

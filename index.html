@@ -3907,9 +3907,9 @@ async function completeOnboarding() {
     localStorage.setItem('digestEmail', email);
     localStorage.setItem('userName', name);
 
-    // Helper for direct REST calls during onboarding using user's auth token
-    const session = await sbClient.auth.getSession();
-    const authToken = session?.data?.session?.access_token || SUPABASE_KEY;
+    // Get auth token from cached session without async call
+    const sessionData = JSON.parse(localStorage.getItem(`sb-fnnegalrrdzcgoelljmi-auth-token`) || '{}');
+    const authToken = sessionData?.access_token || SUPABASE_KEY;
     const directFetch = async (path, method, body) => {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
         method,

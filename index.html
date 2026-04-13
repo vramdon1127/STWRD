@@ -1421,21 +1421,35 @@ window.addEventListener('load', async () => {
     // PKCE: explicitly exchange the code for a session
     if (pkceCode) {
       console.log('[STWRD] PKCE code detected, exchanging for session');
-      const { data, error } = await sbClient.auth.exchangeCodeForSession(pkceCode);
-      if (error) {
-        console.error('[STWRD] PKCE exchange failed:', error.message);
-      } else {
-        console.log('[STWRD] PKCE exchange succeeded');
-      }
-      // Clean the URL regardless of outcome
-      url.searchParams.delete('code');
-      url.searchParams.delete('state');
-      window.history.replaceState(null, '', url.pathname + (url.search || ''));
+      try {
+        const exchangeResult = await Promise.race([
+          sbClient.auth.exchangeCodeForSession(pkceCode),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('exchangeCodeForSession timeout after 5s')), 5000))
+        ]);
+        const { data, error } = exchangeResult;
+        if (error) {
+          console.error('[STWRD] PKCE exchange returned error:', error.message, error);
+        } else if (data?.session) {
+          console.log('[STWRD] PKCE exchange succeeded, user:', data.session.user.id);
+        } else {
+          console.warn('[STWRD] PKCE exchange returned no session and no error');
+        }
+        // Clean the URL regardless of outcome
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
+        window.history.replaceState(null, '', url.pathname + (url.search || ''));
 
-      if (data?.session) {
-        clearTimeout(failsafe);
-        await initApp(data.session.user);
-        return;
+        if (data?.session) {
+          clearTimeout(failsafe);
+          await initApp(data.session.user);
+          return;
+        }
+      } catch(exchangeErr) {
+        console.error('[STWRD] PKCE exchange threw:', exchangeErr.message);
+        // Clean URL anyway so we don't loop on the same code
+        url.searchParams.delete('code');
+        url.searchParams.delete('state');
+        window.history.replaceState(null, '', url.pathname + (url.search || ''));
       }
     } else if (hasHashToken) {
       // Implicit flow (fallback) — let detectSessionInUrl process the hash

@@ -4650,18 +4650,24 @@ function togglePartnerPanel() {
 
 async function loadPartner() {
   try {
-    const data = await sbFetch(`partnerships?or=(inviter_id.eq.${currentUserId},invitee_id.eq.${currentUserId})&status=eq.active&limit=1`);
+    // Two simpler queries instead of one OR — PostgREST's or= syntax is fragile
+    let data = await sbFetch(`partnerships?inviter_id=eq.${currentUserId}&status=eq.active&limit=1`);
+    if (!data || data.length === 0) {
+      data = await sbFetch(`partnerships?invitee_id=eq.${currentUserId}&status=eq.active&limit=1`);
+    }
+    console.log('[STWRD] loadPartner result:', data);
     if (!data || data.length === 0) {
       renderPartnerPanel(null);
       return;
     }
     const partnership = data[0];
     const partnerId = partnership.inviter_id === currentUserId ? partnership.invitee_id : partnership.inviter_id;
-    const profileRows = await sbFetch(`profiles?id=eq.${partnerId}&select=id,display_name,digest_email`);
+    const profileRows = await sbFetch(`profiles?id=eq.${partnerId}&select=id,display_name,digest_email,full_name`);
     const profile = Array.isArray(profileRows) ? profileRows[0] : profileRows;
-    partnerData = { id: partnerId, name: profile?.display_name || 'Partner', profile, partnershipId: partnership.id };
+    partnerData = { id: partnerId, name: profile?.display_name || profile?.full_name?.split(' ')[0] || 'Partner', profile, partnershipId: partnership.id };
     renderPartnerPanel(partnerData);
   } catch(e) {
+    console.error('[STWRD] loadPartner error:', e);
     renderPartnerPanel(null);
   }
 }

@@ -1041,12 +1041,15 @@
 
     <!-- PROJECT DETAIL VIEW -->
     <div id="hatDetail" style="display:none;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-        <button onclick="closeHat()" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;display:flex;align-items:center;gap:6px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          Back
-        </button>
-        <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;" id="hatDetailTitle"></div>
+      <!-- Sticky nav -->
+      <div style="position:sticky;top:0;z-index:50;background:var(--bg);padding:12px 0 10px;margin-bottom:12px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button onclick="closeHat()" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 16px;color:var(--text);cursor:pointer;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </button>
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;" id="hatDetailTitle"></div>
+        </div>
       </div>
       <div class="filter-bar" id="hatFilterBar">
         <button class="filter-chip active" onclick="setHatFilter('all',this)">All</button>

@@ -1189,6 +1189,14 @@
     </div>
 
     <div class="settings-section">
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
+        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">📈 Journey</div>
+        <div class="settings-value" style="margin-bottom:12px;">Reset your 30-day journey to start fresh from today. Your tasks won't be affected.</div>
+        <button onclick="resetJourney()" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--p1)';this.style.color='var(--p1)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">Reset 30-Day Journey</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-row" style="cursor: default; flex-direction: column; align-items: flex-start;">
         <div class="settings-label" style="font-weight: 600;">About</div>
         <div class="settings-value" style="margin-top: 4px;">STWRD v2.0 · Your personal life management system</div>
@@ -2999,7 +3007,7 @@ async function renderProgress() {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div>
           <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);">Life Score Trend</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${weekCount} week${weekCount !== 1 ? 's' : ''} tracked</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${daysIn} day${daysIn !== 1 ? 's' : ''} tracked</div>
         </div>
         <div style="text-align:right;">
           <div style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:${latest.life_score >= 70 ? '#10b981' : latest.life_score >= 40 ? '#fbbf24' : '#ef4444'};">${latest.life_score}</div>
@@ -3400,7 +3408,17 @@ function resetCopyBtn() {
   }
 }
 
-function dismissAiExplainer() {
+async function resetJourney() {
+  if (!confirm('Reset your 30-day journey? This clears your snapshot history and starts fresh from today. Your tasks won\'t be affected.')) return;
+  try {
+    await sbFetch(`weekly_snapshots?user_id=eq.${currentUserId}`, 'DELETE');
+    showToast('✓ Journey reset — starting fresh from today');
+    setTimeout(() => saveWeeklySnapshot(), 500);
+    if (document.getElementById('view-progress').classList.contains('active')) renderProgress();
+  } catch(e) {
+    showToast('❌ Could not reset: ' + e.message);
+  }
+}
   document.getElementById('aiExplainerCard').style.display = 'none';
   localStorage.setItem('aiExplainerDismissed', 'true');
 }

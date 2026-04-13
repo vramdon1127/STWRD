@@ -1474,8 +1474,8 @@ const DEFAULT_PROJECTS = [
 ];
 
 async function loadUserHats() {
-  // Colors that conflict with status indicators — remap them
   const badColors = new Set(['#ef4444','#f59e0b','#fbbf24','#10b981','#34d399','#fb923c','#f97316']);
+  const genericEmojis = new Set(['🚀','📁','💡','⚡','⭐','🌟','🔥','🎯','📌','🗂️','📂','🗃️','💼']);
   try {
     const data = await sbFetch(`projects?user_id=eq.${currentUserId}&order=sort_order.asc`);
     if (data && data.length > 0) {
@@ -1485,13 +1485,17 @@ async function loadUserHats() {
         seen.add(p.name);
         return true;
       });
-      // Remap any bad colors via AI
       userHats = await Promise.all(hats.map(async p => {
-        if (badColors.has(p.color?.toLowerCase())) {
+        const needsColor = badColors.has(p.color?.toLowerCase());
+        const needsEmoji = genericEmojis.has(p.icon);
+        if (needsColor || needsEmoji) {
           const personality = await assignHatPersonality(p.name);
-          // Update in DB silently
-          sbFetch(`projects?id=eq.${p.id}`, 'PATCH', { icon: personality.icon, color: personality.color }).catch(() => {});
-          return { ...p, icon: personality.icon, color: personality.color };
+          const updated = {
+            icon: personality.icon,
+            color: needsColor ? personality.color : p.color
+          };
+          sbFetch(`projects?id=eq.${p.id}`, 'PATCH', updated).catch(() => {});
+          return { ...p, ...updated };
         }
         return p;
       }));

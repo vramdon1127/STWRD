@@ -1032,51 +1032,51 @@
       <button onclick="dismissAiExplainer()" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:18px;line-height:1;z-index:1;">×</button>
       
       <!-- Header -->
-      <div style="padding:16px 16px 12px;border-bottom:1px solid var(--border);">
+      <div style="padding:16px 40px 12px 16px;border-bottom:1px solid var(--border);text-align:center;">
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px;margin-bottom:4px;">⚡ What happens when you tap Process with AI</div>
         <div style="font-size:12px;color:var(--text2);line-height:1.5;">Speak or type anything. STWRD handles the rest — instantly.</div>
       </div>
 
       <!-- Processing steps -->
-      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-        <div style="text-align:center;flex:1;">
-          <div style="font-size:20px;margin-bottom:4px;">🧹</div>
+      <div style="padding:14px 8px;border-bottom:1px solid var(--border);display:flex;justify-content:center;align-items:center;gap:0;">
+        <div style="text-align:center;padding:0 8px;">
+          <div style="font-size:22px;margin-bottom:4px;">🧹</div>
           <div style="font-size:10px;font-weight:600;color:var(--text);">Cleans it up</div>
         </div>
-        <div style="color:var(--border);font-size:14px;">›</div>
-        <div style="text-align:center;flex:1;">
-          <div style="font-size:20px;margin-bottom:4px;">🎩</div>
+        <div style="color:var(--border);font-size:12px;padding:0 2px;">›</div>
+        <div style="text-align:center;padding:0 8px;">
+          <div style="font-size:22px;margin-bottom:4px;">🎩</div>
           <div style="font-size:10px;font-weight:600;color:var(--text);">Assigns project</div>
         </div>
-        <div style="color:var(--border);font-size:14px;">›</div>
-        <div style="text-align:center;flex:1;">
-          <div style="font-size:20px;margin-bottom:4px;">🔴</div>
+        <div style="color:var(--border);font-size:12px;padding:0 2px;">›</div>
+        <div style="text-align:center;padding:0 8px;">
+          <div style="font-size:22px;margin-bottom:4px;">🔴</div>
           <div style="font-size:10px;font-weight:600;color:var(--text);">Sets priority</div>
         </div>
-        <div style="color:var(--border);font-size:14px;">›</div>
-        <div style="text-align:center;flex:1;">
-          <div style="font-size:20px;margin-bottom:4px;">📅</div>
+        <div style="color:var(--border);font-size:12px;padding:0 2px;">›</div>
+        <div style="text-align:center;padding:0 8px;">
+          <div style="font-size:22px;margin-bottom:4px;">📅</div>
           <div style="font-size:10px;font-weight:600;color:var(--text);">Extracts date</div>
         </div>
-        <div style="color:var(--border);font-size:14px;">›</div>
-        <div style="text-align:center;flex:1;">
-          <div style="font-size:20px;margin-bottom:4px;">🤖</div>
+        <div style="color:var(--border);font-size:12px;padding:0 2px;">›</div>
+        <div style="text-align:center;padding:0 8px;">
+          <div style="font-size:22px;margin-bottom:4px;">🤖</div>
           <div style="font-size:10px;font-weight:600;color:var(--text);">Categorizes</div>
         </div>
       </div>
 
       <!-- Categories -->
       <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:flex-start;gap:10px;">
-          <div style="background:rgba(16,185,129,0.15);color:var(--done);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;">AI Complete</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="background:rgba(16,185,129,0.15);color:var(--done);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:80px;text-align:center;">AI Complete</div>
           <div style="font-size:12px;color:var(--text2);line-height:1.4;">AI handles it fully. One tap to run.</div>
         </div>
-        <div style="display:flex;align-items:flex-start;gap:10px;">
-          <div style="background:rgba(56,189,248,0.15);color:var(--ai-assist);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;">AI Assist</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="background:rgba(56,189,248,0.15);color:var(--ai-assist);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:80px;text-align:center;">AI Assist</div>
           <div style="font-size:12px;color:var(--text2);line-height:1.4;">AI preps it, you take the final action.</div>
         </div>
-        <div style="display:flex;align-items:flex-start;gap:10px;">
-          <div style="background:rgba(148,163,184,0.15);color:var(--manual);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;">Manual</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="background:rgba(148,163,184,0.15);color:var(--manual);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:80px;text-align:center;">Manual</div>
           <div style="font-size:12px;color:var(--text2);line-height:1.4;">Only you can do this. STWRD tracks it.</div>
         </div>
       </div>

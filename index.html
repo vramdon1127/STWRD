@@ -1754,6 +1754,7 @@ async function loadCorrections() {
 // ─── REALTIME POLLING ─────────────────────────────────────────
 function setupRealtime() {
   setInterval(async () => {
+    if (viewingPartner) return; // don't stomp partner view
     try {
       const data = await sbFetch(`tasks?user_id=eq.${currentUserId}&status=neq.done&order=created_at.desc&limit=100`);
       const newTasks = data || [];
@@ -1761,6 +1762,7 @@ function setupRealtime() {
       const newIds = JSON.stringify(newTasks.map(t => t.id + t.status));
       if (oldIds !== newIds) {
         tasks = newTasks;
+        myTasks = [...newTasks]; // keep myTasks in sync
         renderTasks();
         if (currentHat) renderHatTasks();
         renderStats();

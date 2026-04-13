@@ -1,14 +1,20 @@
-// STWRD Daily Digest — runs every morning at 7am CT via Vercel cron
+// STWRD Daily Digest — runs every morning at 6am CT via cron-job.org
 // Pulls tasks from Supabase, generates AI summary, sends via Resend
 
 const SUPABASE_URL = 'https://fnnegalrrdzcgoelljmi.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZubmVnYWxycmR6Y2dvZWxsam1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDMwNjksImV4cCI6MjA5MTUxOTA2OX0.bhgk6czCQYTuUGnu5Zv7pml9uMuPrp4I1VBSzVIHwqw';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZubmVnYWxycmR6Y2dvZWxsam1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDMwNjksImV4cCI6MjA5MTUxOTA2OX0.bhgk6czCQYTuUGnu5Zv7pml9uMuPrp4I1VBSzVIHwqw';
 
-async function sbFetch(path) {
+// Use service role key to bypass RLS for server-side digest
+function getServiceKey() {
+  return process.env.SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
+}
+
+async function sbFetch(path, useServiceRole = false) {
+  const key = useServiceRole ? getServiceKey() : SUPABASE_ANON_KEY;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
     }
   });
@@ -32,7 +38,7 @@ export default async function handler(req, res) {
   try {
     // ── Pull all user profiles for digest sending ──────────────
     // For now send to all users who have digest_email set
-    const profiles = await sbFetch('profiles?digest_email=not.is.null&select=id,digest_email,anthropic_key');
+    const profiles = await sbFetch('profiles?digest_email=not.is.null&select=id,digest_email,anthropic_key', true);
     
     if (!profiles || profiles.length === 0) {
       return res.status(200).json({ message: 'No users with digest email configured' });
@@ -277,12 +283,12 @@ FOCUS: [your recommendation here]`;
 
     <!-- CTA -->
     <div style="text-align:center;margin-bottom:24px;">
-      <a href="https://chief-of-staff-blond-gamma.vercel.app" style="display:inline-block;background:linear-gradient(135deg,#7c6fef,#8b5cf6);color:white;text-decoration:none;padding:14px 32px;border-radius:12px;font-size:14px;font-weight:700;letter-spacing:0.5px;">Open STWRD →</a>
+      <a href="https://getstwrd.com" style="display:inline-block;background:linear-gradient(135deg,#7c6fef,#8b5cf6);color:white;text-decoration:none;padding:14px 32px;border-radius:12px;font-size:14px;font-weight:700;letter-spacing:0.5px;">Open STWRD →</a>
     </div>
 
     <!-- FOOTER -->
     <div style="text-align:center;font-size:11px;color:#8888aa;">
-      STWRD · Built for Vijay & Family · <a href="https://chief-of-staff-blond-gamma.vercel.app" style="color:#7c6fef;text-decoration:none;">Manage settings</a>
+      STWRD · Your Household OS · <a href="https://getstwrd.com" style="color:#7c6fef;text-decoration:none;">Open app</a>
     </div>
 
   </div>

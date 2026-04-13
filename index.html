@@ -2385,24 +2385,23 @@ function renderToday() {
 }
 
 function renderTodayCard(task, type) {
-  const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
-  const color = projColors[task.project] || 'var(--accent)';
-  const borderColor = type === 'overdue' ? 'var(--p1)' : type === 'today' ? 'var(--accent3)' : 'var(--border)';
+  const borderColor = type === 'overdue' ? 'var(--p1)' : type === 'today' ? 'var(--done)' : 'var(--border)';
+  const accentColor = type === 'overdue' ? 'var(--p1)' : type === 'today' ? 'var(--done)' : 'var(--border)';
   const dueLabel = type === 'overdue' ? `Due ${task.due_date}` : type === 'upcoming' ? `Due ${task.due_date}` : 'Due Today';
   
-  return `<div style="background:var(--surface);border:1px solid ${borderColor};border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
-    <div style="width:4px;height:40px;background:${color};border-radius:2px;flex-shrink:0;"></div>
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+    <div style="width:3px;height:40px;background:${accentColor};border-radius:2px;flex-shrink:0;"></div>
     <div style="flex:1;min-width:0;">
       <div style="font-size:14px;font-weight:500;margin-bottom:4px;">${task.cleaned_task || task.content}</div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <span style="font-size:11px;color:${color};font-weight:600;">${task.project}</span>
+        <span style="font-size:11px;color:var(--text2);font-weight:500;">${task.project}</span>
         <span style="font-size:11px;color:var(--text2);">·</span>
         <span style="font-size:11px;color:${type === 'overdue' ? 'var(--p1)' : 'var(--text2)'};">${dueLabel}</span>
       </div>
     </div>
     <div style="display:flex;gap:6px;">
       <button onclick="openEditModal('${task.id}')" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;">Edit</button>
-      <button onclick="quickComplete('${task.id}')" style="padding:6px 10px;border-radius:8px;border:none;background:var(--accent3);color:#0a0a0f;font-size:11px;font-weight:700;cursor:pointer;">Done</button>
+      <button onclick="quickComplete('${task.id}')" style="padding:6px 10px;border-radius:8px;border:none;background:var(--done);color:#0a0a0f;font-size:11px;font-weight:700;cursor:pointer;">Done</button>
     </div>
   </div>`;
 }

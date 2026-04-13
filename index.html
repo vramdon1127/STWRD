@@ -1665,10 +1665,19 @@ function toggleUserMenu() {
 }
 
 async function signOut() {
-  await sbClient.auth.signOut();
+  // Clear localStorage first in case SDK signOut hangs on Safari
+  localStorage.removeItem('stwrd-auth');
+  localStorage.removeItem('stwrd-auth-code-verifier');
   localStorage.removeItem('apiKey');
   localStorage.removeItem('advisorCache');
   localStorage.removeItem('advisorFingerprint');
+  // Fire SDK signOut but don't block on it
+  try {
+    await Promise.race([
+      sbClient.auth.signOut(),
+      new Promise(r => setTimeout(r, 1000))
+    ]);
+  } catch(e) {}
   showAuthScreen();
 }
 
@@ -3056,20 +3065,32 @@ async function saveApiKey() {
   if (!key) return;
   localStorage.setItem('apiKey', key);
   try {
-    await sbClient.from('profiles').upsert({ id: currentUserId, anthropic_key: key });
+    // Upsert via direct fetch (Prefer: resolution=merge-duplicates)
+    const sess = JSON.parse(localStorage.getItem('stwrd-auth') || '{}');
+    const token = sess?.access_token || SUPABASE_KEY;
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ id: currentUserId, anthropic_key: key }),
+    });
   } catch(e) {}
   showToast('✓ API key saved');
 }
 
 async function clearDone() {
-  await sbClient.from('tasks').delete().eq('user_id', currentUserId).eq('status', 'done');
+  await sbFetch(`tasks?user_id=eq.${currentUserId}&status=eq.done`, 'DELETE');
   await loadTasks();
   showToast('Completed tasks cleared');
 }
 
 async function clearAll() {
   if (!confirm('Delete ALL tasks? This cannot be undone.')) return;
-  await sbClient.from('tasks').delete().eq('user_id', currentUserId);
+  await sbFetch(`tasks?user_id=eq.${currentUserId}`, 'DELETE');
   tasks = [];
   renderTasks();
   renderStats();
@@ -3771,7 +3792,7 @@ async function updateLifeGoal(catId, newGoal) {
   cat.goal = newGoal;
   document.getElementById(`goal-${catId}`).textContent = newGoal;
   try {
-    await sbClient.from('life_categories').update({ goal: newGoal }).eq('id', catId).eq('user_id', currentUserId);
+    await sbFetch(`life_categories?id=eq.${catId}&user_id=eq.${currentUserId}`, 'PATCH', { goal: newGoal });
     showToast(`✓ ${cat.name} goal updated`);
   } catch(e) {
     showToast('❌ Could not save: ' + e.message);
@@ -3809,7 +3830,7 @@ async function saveLifeAreaName(catId, newName) {
   if (!cat || cat.name === newName) return;
   cat.name = newName;
   try {
-    await sbClient.from('life_categories').update({ name: newName }).eq('id', catId).eq('user_id', currentUserId);
+    await sbFetch(`life_categories?id=eq.${catId}&user_id=eq.${currentUserId}`, 'PATCH', { name: newName });
     showToast(`✓ Renamed to ${newName}`);
     renderLifeAreasEditor();
     renderKeywordEditor();
@@ -3819,7 +3840,7 @@ async function saveLifeAreaName(catId, newName) {
 async function deleteLifeArea(catId, name) {
   if (!confirm(`Remove "${name}" from your life areas?`)) return;
   try {
-    await sbClient.from('life_categories').delete().eq('id', catId).eq('user_id', currentUserId);
+    await sbFetch(`life_categories?id=eq.${catId}&user_id=eq.${currentUserId}`, 'DELETE');
     userLifeCategories = userLifeCategories.filter(c => c.id !== catId);
     showToast(`✓ ${name} removed`);
     renderLifeAreasEditor();
@@ -3832,7 +3853,7 @@ async function addLifeArea() {
   const icon = icons[Math.floor(Math.random() * icons.length)];
   const name = 'New Area';
   try {
-    const { data, error } = await sbClient.from('life_categories').insert({
+    const inserted = await sbFetch('life_categories', 'POST', {
       user_id: currentUserId,
       name,
       icon,
@@ -3841,8 +3862,9 @@ async function addLifeArea() {
       keywords: [],
       active: true,
       sort_order: userLifeCategories.length + 1
-    }).select().single();
-    if (error) throw error;
+    });
+    const data = Array.isArray(inserted) ? inserted[0] : inserted;
+    if (!data) throw new Error('No data returned');
     userLifeCategories.push(data);
     renderLifeAreasEditor();
     renderKeywordEditor();
@@ -3892,7 +3914,7 @@ function pickLifeAreaIcon(catId) {
       if (!cat) return;
       cat.icon = ic;
       try {
-        await sbClient.from('life_categories').update({ icon: ic }).eq('id', catId).eq('user_id', currentUserId);
+        await sbFetch(`life_categories?id=eq.${catId}&user_id=eq.${currentUserId}`, 'PATCH', { icon: ic });
         renderLifeAreasEditor();
         showToast(`✓ Icon updated`);
       } catch(e) { showToast('❌ Could not update icon'); }
@@ -3942,7 +3964,7 @@ async function saveKeywords(catId, value) {
   if (!cat) return;
   cat.keywords = keywords;
   try {
-    await sbClient.from('life_categories').update({ keywords }).eq('id', catId).eq('user_id', currentUserId);
+    await sbFetch(`life_categories?id=eq.${catId}&user_id=eq.${currentUserId}`, 'PATCH', { keywords });
     showToast(`✓ ${cat.name} keywords saved`);
   } catch(e) {
     showToast('❌ Could not save keywords');
@@ -4344,10 +4366,7 @@ async function approveKeywords(categoryName, keywords) {
     const cat = userLifeCategories.find(c => c.name === categoryName);
     if (cat) {
       const merged = [...new Set([...(cat.keywords || []), ...kwArray])];
-      await sbClient.from('life_categories')
-        .update({ keywords: merged })
-        .eq('id', cat.id)
-        .eq('user_id', currentUserId);
+      await sbFetch(`life_categories?id=eq.${cat.id}&user_id=eq.${currentUserId}`, 'PATCH', { keywords: merged });
       cat.keywords = merged;
       showToast(`✓ ${categoryName} keywords updated`);
     }
@@ -4372,12 +4391,24 @@ async function saveDigestSettings() {
   if (!email) { showToast('⚠️ Enter your email address'); return; }
 
   try {
-    await sbClient.from('profiles').upsert({
-      id: currentUserId,
-      digest_email: email,
-      resend_key: resendKey || null,
-      anthropic_key: apiKey || null,
+    const sess = JSON.parse(localStorage.getItem('stwrd-auth') || '{}');
+    const token = sess?.access_token || SUPABASE_KEY;
+    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        id: currentUserId,
+        digest_email: email,
+        resend_key: resendKey || null,
+        anthropic_key: apiKey || null,
+      }),
     });
+    if (!upsertRes.ok) throw new Error(await upsertRes.text());
     if (apiKey) localStorage.setItem('apiKey', apiKey);
     showToast('✓ Digest settings saved');
   } catch(e) {
@@ -4403,7 +4434,8 @@ async function testDigest() {
 async function loadDigestSettings() {
   try {
     if (!currentUserId) return;
-    const { data } = await sbClient.from('profiles').select('digest_email,resend_key,anthropic_key').eq('id', currentUserId).single();
+    const rows = await sbFetch(`profiles?id=eq.${currentUserId}&select=digest_email,resend_key,anthropic_key`);
+    const data = Array.isArray(rows) ? rows[0] : rows;
     if (data?.digest_email) document.getElementById('digestEmailInput').value = data.digest_email;
     if (data?.resend_key) document.getElementById('resendKeyInput').value = data.resend_key;
   } catch(e) {}
@@ -4554,7 +4586,8 @@ async function loadPartner() {
     }
     const partnership = data[0];
     const partnerId = partnership.inviter_id === currentUserId ? partnership.invitee_id : partnership.inviter_id;
-    const { data: profile } = await sbClient.from('profiles').select('id,display_name,digest_email').eq('id', partnerId).single();
+    const profileRows = await sbFetch(`profiles?id=eq.${partnerId}&select=id,display_name,digest_email`);
+    const profile = Array.isArray(profileRows) ? profileRows[0] : profileRows;
     partnerData = { id: partnerId, name: profile?.display_name || 'Partner', profile, partnershipId: partnership.id };
     renderPartnerPanel(partnerData);
   } catch(e) {
@@ -4600,7 +4633,7 @@ async function switchView(mode) {
     viewingPartner = true;
     myTasks = [...tasks];
     myHats = [...userHats];
-    const { data } = await sbClient.from('tasks').select('*').eq('user_id', partnerData.id).neq('status', 'done').order('created_at', { ascending: false }).limit(100);
+    const data = await sbFetch(`tasks?user_id=eq.${partnerData.id}&status=neq.done&order=created_at.desc&limit=100`);
     tasks = data || [];
     const hatsData = await sbFetch(`projects?user_id=eq.${partnerData.id}&order=sort_order.asc`);
     if (hatsData && hatsData.length > 0) {

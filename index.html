@@ -898,9 +898,16 @@
 <header style="display:none;">
   <div class="logo" onclick="showView('capture')" style="cursor:pointer;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>STWRD</div>
-  <div class="user-badge" onclick="toggleUserMenu()" style="position:relative;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-    <span id="currentUser">Me</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <!-- Partner toggle — hidden until linked -->
+    <div id="partnerToggle" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px;display:none;align-items:center;gap:2px;">
+      <button id="myViewBtn" onclick="switchView('mine')" style="padding:5px 10px;border-radius:16px;border:none;background:var(--accent);color:white;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;">Me</button>
+      <button id="partnerViewBtn" onclick="switchView('partner')" style="padding:5px 10px;border-radius:16px;border:none;background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;" id="partnerViewBtn"></button>
+    </div>
+    <div class="user-badge" onclick="toggleUserMenu()" style="position:relative;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      <span id="currentUser">Me</span>
+    </div>
   </div>
   <div id="userMenu" style="display:none;position:absolute;top:60px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;z-index:200;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
     <button onclick="showView('settings');toggleUserMenu()" style="width:100%;padding:10px 12px;background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;text-align:left;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">⚙️ Settings</button>
@@ -1057,6 +1064,22 @@
         <div class="settings-value" style="margin-top: 4px;">STWRD v2.0 · Your personal life management system</div>
       </div>
     </div>
+
+    <!-- PARTNER SECTION -->
+    <div class="settings-section">
+      <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
+        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">👫 Partner</div>
+        <div class="settings-value" style="margin-bottom:12px;">Link accounts to view each other's tasks and life scores</div>
+        <div id="partnerStatus" style="width:100%;">
+          <div style="color:var(--text2);font-size:13px;margin-bottom:12px;">Loading partner status...</div>
+        </div>
+        <button onclick="generateInvite()" id="inviteBtn" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Generate Invite Link
+        </button>
+        <div id="inviteResult" style="margin-top:10px;width:100%;"></div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -1174,6 +1197,12 @@ let recognition = null;
 let isRecording = false;
 let currentAiTaskId = null;
 
+// ─── PARTNER STATE ────────────────────────────────────────────
+let partnerData = null;       // { id, name, profile }
+let viewingPartner = false;   // true = showing partner's view
+let myTasks = [];             // backup of own tasks when switching views
+let myHats = [];              // backup of own hats
+
 // ─── INIT ─────────────────────────────────────────────────────
 let knowledgeBase = {};
 let corrections = [];
@@ -1236,6 +1265,11 @@ async function initApp(user) {
   await loadKnowledge();
   await loadCorrections();
   await loadTasks();
+  await loadPartner();
+  // Handle invite token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteToken = urlParams.get('invite');
+  if (inviteToken) acceptInvite(inviteToken);
   setTimeout(saveWeeklySnapshot, 5000);
   setupRealtime();
   
@@ -1362,7 +1396,7 @@ async function sbFetch(path, method = 'GET', body = null) {
       'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'Prefer': method === 'POST' ? 'return=representation' : ''
+      'Prefer': method === 'POST' ? 'return=representation' : method === 'PATCH' ? 'return=representation' : ''
     }
   };
   if (body) opts.body = JSON.stringify(body);
@@ -3404,6 +3438,164 @@ function toggleMic() {
   };
 
   recognition.start();
+}
+
+// ─── PARTNER SYSTEM ───────────────────────────────────────────
+
+async function loadPartner() {
+  try {
+    const data = await sbFetch(`partnerships?or=(inviter_id.eq.${currentUserId},invitee_id.eq.${currentUserId})&status=eq.active&limit=1`);
+    if (!data || data.length === 0) {
+      renderPartnerStatus(null);
+      return;
+    }
+    const partnership = data[0];
+    const partnerId = partnership.inviter_id === currentUserId ? partnership.invitee_id : partnership.inviter_id;
+    // Load partner profile
+    const { data: profiles } = await sbClient.from('profiles').select('id,display_name,digest_email').eq('id', partnerId).single();
+    partnerData = { id: partnerId, name: profiles?.display_name || 'Partner', profile: profiles, partnershipId: partnership.id };
+    renderPartnerStatus(partnerData);
+    showPartnerToggle();
+  } catch(e) {
+    renderPartnerStatus(null);
+  }
+}
+
+function renderPartnerStatus(partner) {
+  const el = document.getElementById('partnerStatus');
+  if (!el) return;
+  if (partner) {
+    el.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:14px;">💑</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;">${partner.name}</div>
+            <div style="font-size:11px;color:var(--personal);">● Linked</div>
+          </div>
+        </div>
+        <button onclick="unlinkPartner('${partner.partnershipId}')" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;">Unlink</button>
+      </div>`;
+    const inviteBtn = document.getElementById('inviteBtn');
+    if (inviteBtn) inviteBtn.style.display = 'none';
+  } else {
+    el.innerHTML = `<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">No partner linked yet. Generate an invite link and share it with your partner.</div>`;
+    const inviteBtn = document.getElementById('inviteBtn');
+    if (inviteBtn) inviteBtn.style.display = 'flex';
+  }
+}
+
+function showPartnerToggle() {
+  if (!partnerData) return;
+  const toggle = document.getElementById('partnerToggle');
+  const partnerBtn = document.getElementById('partnerViewBtn');
+  if (toggle && partnerBtn) {
+    partnerBtn.textContent = partnerData.name;
+    toggle.style.display = 'flex';
+  }
+}
+
+async function switchView(mode) {
+  const myBtn = document.getElementById('myViewBtn');
+  const partnerBtn = document.getElementById('partnerViewBtn');
+
+  if (mode === 'partner' && partnerData) {
+    viewingPartner = true;
+    myTasks = [...tasks];
+    myHats = [...userHats];
+    // Load partner's tasks
+    const { data } = await sbClient.from('tasks').select('*').eq('user_id', partnerData.id).neq('status', 'done').order('created_at', { ascending: false }).limit(100);
+    tasks = data || [];
+    // Load partner's hats
+    const hatsData = await sbFetch(`projects?user_id=eq.${partnerData.id}&order=sort_order.asc`);
+    if (hatsData && hatsData.length > 0) {
+      const seen = new Set();
+      userHats = hatsData.filter(p => { if (seen.has(p.name)) return false; seen.add(p.name); return true; });
+    }
+    myBtn.style.background = 'transparent';
+    myBtn.style.color = 'var(--text2)';
+    partnerBtn.style.background = 'var(--accent2)';
+    partnerBtn.style.color = 'white';
+    renderTasks();
+    showToast(`👀 Viewing ${partnerData.name}'s world`);
+  } else {
+    viewingPartner = false;
+    if (myTasks.length > 0) tasks = [...myTasks];
+    if (myHats.length > 0) userHats = [...myHats];
+    myBtn.style.background = 'var(--accent)';
+    myBtn.style.color = 'white';
+    partnerBtn.style.background = 'transparent';
+    partnerBtn.style.color = 'var(--text2)';
+    renderTasks();
+    showToast('🏠 Back to your world');
+  }
+}
+
+async function generateInvite() {
+  const btn = document.getElementById('inviteBtn');
+  const result = document.getElementById('inviteResult');
+  btn.disabled = true;
+  btn.innerHTML = 'Generating...';
+  try {
+    const token = crypto.randomUUID();
+    await sbFetch('partnerships', 'POST', {
+      inviter_id: currentUserId,
+      invite_token: token,
+      status: 'pending'
+    });
+    const link = `${window.location.origin}${window.location.pathname}?invite=${token}`;
+    result.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Share this link with your partner:</div>
+        <div style="font-size:12px;color:var(--text);word-break:break-all;margin-bottom:10px;background:var(--bg);padding:8px;border-radius:6px;">${link}</div>
+        <button onclick="copyInviteLink('${link}')" style="width:100%;padding:8px;border-radius:8px;border:none;background:var(--accent);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">📋 Copy Link</button>
+      </div>`;
+  } catch(e) {
+    result.innerHTML = `<div style="color:var(--accent2);font-size:13px;">Failed to generate invite. Try again.</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Generate Invite Link';
+  }
+}
+
+function copyInviteLink(link) {
+  navigator.clipboard.writeText(link).then(() => showToast('✓ Invite link copied!'));
+}
+
+async function acceptInvite(token) {
+  try {
+    // Find the partnership by token
+    const data = await sbFetch(`partnerships?invite_token=eq.${token}&status=eq.pending&limit=1`);
+    if (!data || data.length === 0) { showToast('⚠️ Invite link is invalid or already used'); return; }
+    const partnership = data[0];
+    if (partnership.inviter_id === currentUserId) { showToast('⚠️ You cannot accept your own invite'); return; }
+    // Accept it
+    await sbFetch(`partnerships?id=eq.${partnership.id}`, 'PATCH', {
+      invitee_id: currentUserId,
+      status: 'active'
+    });
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    await loadPartner();
+    showToast('🎉 Partner linked! You can now view each other\'s world.');
+  } catch(e) {
+    showToast('⚠️ Could not accept invite: ' + e.message);
+  }
+}
+
+async function unlinkPartner(partnershipId) {
+  if (!confirm('Unlink partner? You will no longer see each other\'s tasks.')) return;
+  try {
+    await sbFetch(`partnerships?id=eq.${partnershipId}`, 'DELETE');
+    partnerData = null;
+    viewingPartner = false;
+    document.getElementById('partnerToggle').style.display = 'none';
+    if (myTasks.length > 0) { tasks = [...myTasks]; renderTasks(); }
+    renderPartnerStatus(null);
+    showToast('Partner unlinked');
+  } catch(e) {
+    showToast('❌ Could not unlink: ' + e.message);
+  }
 }
 </script>
 <!-- CHAT BUTTON -->

@@ -3907,9 +3907,16 @@ async function completeOnboarding() {
     localStorage.setItem('digestEmail', email);
     localStorage.setItem('userName', name);
 
-    // Get auth token from cached session without async call
-    const sessionData = JSON.parse(localStorage.getItem(`sb-fnnegalrrdzcgoelljmi-auth-token`) || '{}');
-    const authToken = sessionData?.access_token || SUPABASE_KEY;
+    // Get auth token from the live Supabase session (not localStorage — storageKey is custom)
+    const { data: { session: liveSession } } = await sbClient.auth.getSession();
+    if (!liveSession?.access_token) {
+      throw new Error('No active session — please sign in again');
+    }
+    const authToken = liveSession.access_token;
+    // Also make sure currentUserId matches the live session (avoids stale-id bugs)
+    if (liveSession.user?.id) {
+      currentUserId = liveSession.user.id;
+    }
     const directFetch = async (path, method, body) => {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
         method,

@@ -22,13 +22,14 @@
     /* PROJECT COLORS — each unique, never reused elsewhere */
     --gne: #f472b6;         /* soft pink — GNE only */
     --caliber: #60a5fa;     /* sky blue — Caliber only */
-    --personal: #34d399;    /* emerald — Personal only */
+    --personal: #a78bfa;    /* soft purple — Personal only */
     --servents: #fb923c;    /* orange — ServeAnts only */
+    --family: #22d3ee;      /* cyan — Family only */
 
     /* PRIORITY COLORS — severity scale, red reserved for P1 only */
     --p1: #ef4444;          /* red — urgent, danger */
     --p2: #f59e0b;          /* amber — important */
-    --p3: #a78bfa;          /* soft purple — normal */
+    --p3: #8b8fa8;          /* muted — normal */
     --p4: #6b7280;          /* gray — low */
 
     /* CATEGORY COLORS — action-oriented */
@@ -36,7 +37,7 @@
     --ai-assist: #38bdf8;   /* light blue — AI helps */
     --manual: #94a3b8;      /* slate — human only */
 
-    /* STATUS */
+    /* STATUS — green/amber/red reserved for completion states only */
     --done: #10b981;
     --accent2: #f472b6;
     --accent3: #10b981;
@@ -397,7 +398,7 @@
   /* PROJECT TAGS */
   .tag-project-gne { background: rgba(244,114,182,0.15); color: var(--gne); }
   .tag-project-caliber { background: rgba(96,165,250,0.15); color: var(--caliber); }
-  .tag-project-personal { background: rgba(52,211,153,0.15); color: var(--personal); }
+  .tag-project-personal { background: rgba(167,139,250,0.15); color: var(--personal); }
   .tag-project-servants { background: rgba(251,146,60,0.15); color: var(--servents); }
 
   /* CATEGORY TAGS */
@@ -958,7 +959,7 @@
       <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">💑</div>
       <div style="flex:1;">
         <div id="partnerCardName" style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;"></div>
-        <div style="font-size:12px;color:var(--personal);margin-top:2px;">● Linked</div>
+        <div style="font-size:12px;color:var(--done);margin-top:2px;">● Linked</div>
       </div>
     </div>
 
@@ -981,9 +982,6 @@
   <div class="view active" id="view-capture">
     <div class="capture-card">
       <div class="capture-label">New Task</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:13px;color:var(--text2);">Adding as <span id="taskAddingAs" style="color:var(--text);font-weight:500;">me</span></div>
-      </div>
       <div class="capture-input-row">
         <textarea class="capture-input" id="taskInput" placeholder="Type or dictate a task..." rows="1"
           oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
@@ -1470,7 +1468,7 @@ async function sbFetch(path, method = 'GET', body = null) {
 // ─── USER PROJECTS ─────────────────────────────────────────────
 const DEFAULT_PROJECTS = [
   { name: 'Work', icon: '💼', color: '#60a5fa' },
-  { name: 'Family', icon: '🏠', color: '#34d399' },
+  { name: 'Family', icon: '🏠', color: '#22d3ee' },
   { name: 'Health', icon: '💪', color: '#fb923c' },
   { name: 'Personal', icon: '✨', color: '#a78bfa' },
 ];
@@ -1745,7 +1743,7 @@ const HATS = [
 
 // Color lookup helper
 function hatColor(name) {
-  const map = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
+  const map = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)', Family: 'var(--family)' };
   return map[name] || 'var(--accent)';
 }
 
@@ -1911,7 +1909,7 @@ async function renderStats() {
       advice: { low: 'Work tasks are piling up — focus time needed', high: 'Work output is strong this week' }
     },
     {
-      name: 'Family', icon: '🏠', color: '#34d399',
+      name: 'Family', icon: '🏠', color: '#22d3ee',
       keywords: ['mia', 'baby', 'home', 'house', 'birthday', 'gift', 'party', 'nursery', 'paint', 'mattress', 'depot', 'crue', 'jada'],
       goal: 2, unit: 'tasks/week',
       advice: { low: 'Family tasks are getting sidelined — easy to let slip', high: 'Family is getting real attention this week' }
@@ -1975,14 +1973,14 @@ async function renderStats() {
 
     <!-- LIFE BALANCE SCORE -->
     <div class="stat-card" style="margin-bottom:16px;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#60a5fa,#34d399,#fb923c,#a78bfa,#fbbf24,#38bdf8);"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#60a5fa,#22d3ee,#fb923c,#a78bfa,#fbbf24,#38bdf8);"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div>
           <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);">Life Balance</div>
           
         </div>
         <div style="text-align:center;">
-          <div style="font-family:'Syne',sans-serif;font-size:36px;font-weight:800;color:${avgLifeScore >= 70 ? '#34d399' : avgLifeScore >= 40 ? '#fbbf24' : '#ef4444'};">${avgLifeScore}</div>
+          <div style="font-family:'Syne',sans-serif;font-size:36px;font-weight:800;color:${avgLifeScore >= 70 ? '#10b981' : avgLifeScore >= 40 ? '#fbbf24' : '#ef4444'};">${avgLifeScore}</div>
           <div style="font-size:11px;color:var(--text2);">/ 100</div>
         </div>
       </div>
@@ -2047,10 +2045,10 @@ async function renderStats() {
     <div class="stat-card" style="margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);">Weekly Completion Rate</div>
-        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${completionRate >= 70 ? 'var(--personal)' : completionRate >= 40 ? 'var(--p2)' : 'var(--p2)'};">${completionRate}%</div>
+        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${completionRate >= 70 ? 'var(--done)' : completionRate >= 40 ? 'var(--p2)' : 'var(--p2)'};">${completionRate}%</div>
       </div>
       <div style="background:var(--surface2);border-radius:6px;height:8px;overflow:hidden;">
-        <div style="width:${completionRate}%;height:100%;background:${completionRate >= 70 ? 'var(--personal)' : 'var(--p2)'};border-radius:6px;"></div>
+        <div style="width:${completionRate}%;height:100%;background:${completionRate >= 70 ? 'var(--done)' : 'var(--p2)'};border-radius:6px;"></div>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px;">${completedThisWeek} completed of ${addedThisWeek} added this week</div>
     </div>
@@ -2727,7 +2725,7 @@ async function renderProgress() {
 
   const lifeCategories = [
     { key: 'life_work', name: 'Work', color: '#60a5fa', icon: '💼' },
-    { key: 'life_family', name: 'Family', color: '#34d399', icon: '🏠' },
+    { key: 'life_family', name: 'Family', color: '#22d3ee', icon: '🏠' },
     { key: 'life_health', name: 'Health', color: '#fb923c', icon: '💪' },
     { key: 'life_faith', name: 'Faith', color: '#a78bfa', icon: '🙏' },
     { key: 'life_finance', name: 'Personal Finance', color: '#fbbf24', icon: '💰' },
@@ -2743,11 +2741,11 @@ async function renderProgress() {
         <div style="font-size:11px;color:var(--text2);margin-top:2px;">Days In</div>
       </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;">
-        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:${daysLeft === 0 ? 'var(--personal)' : 'var(--text)'};">${daysLeft}</div>
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:${daysLeft === 0 ? 'var(--done)' : 'var(--text)'};">${daysLeft}</div>
         <div style="font-size:11px;color:var(--text2);margin-top:2px;">Days Left</div>
       </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;">
-        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:${scoreDelta >= 0 ? 'var(--personal)' : 'var(--p1)'};">${scoreDelta >= 0 ? '+' : ''}${scoreDelta}</div>
+        <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:${scoreDelta >= 0 ? 'var(--done)' : 'var(--p1)'};">${scoreDelta >= 0 ? '+' : ''}${scoreDelta}</div>
         <div style="font-size:11px;color:var(--text2);margin-top:2px;">Score Δ</div>
       </div>
     </div>
@@ -2761,7 +2759,7 @@ async function renderProgress() {
           <div style="font-size:11px;color:var(--text2);margin-top:2px;">${weekCount} week${weekCount !== 1 ? 's' : ''} tracked</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:${latest.life_score >= 70 ? '#34d399' : latest.life_score >= 40 ? '#fbbf24' : '#ef4444'};">${latest.life_score}</div>
+          <div style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:${latest.life_score >= 70 ? '#10b981' : latest.life_score >= 40 ? '#fbbf24' : '#ef4444'};">${latest.life_score}</div>
           <div style="font-size:11px;color:var(--text2);">this week</div>
         </div>
       </div>
@@ -2804,7 +2802,7 @@ async function renderProgress() {
               <span style="font-size:13px;font-weight:500;">${cat.name}</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:11px;color:${delta > 0 ? 'var(--personal)' : delta < 0 ? 'var(--p1)' : 'var(--text2)'};">${delta > 0 ? '↑' : delta < 0 ? '↓' : '→'} ${Math.abs(delta)}%</span>
+              <span style="font-size:11px;color:${delta > 0 ? 'var(--done)' : delta < 0 ? 'var(--p1)' : 'var(--text2)'};">${delta > 0 ? '↑' : delta < 0 ? '↓' : '→'} ${Math.abs(delta)}%</span>
               <span style="font-size:11px;color:var(--text2);">${latest_val}%</span>
             </div>
           </div>
@@ -2821,7 +2819,7 @@ async function renderProgress() {
       <div style="display:flex;align-items:flex-end;gap:6px;height:60px;">
         ${snapshots.map((s, i) => {
           const h = Math.max(4, (s.completion_rate / 100) * 56);
-          const color = s.completion_rate >= 70 ? '#34d399' : s.completion_rate >= 40 ? '#fbbf24' : '#ef4444';
+          const color = s.completion_rate >= 70 ? '#10b981' : s.completion_rate >= 40 ? '#fbbf24' : '#ef4444';
           return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
             <div style="font-size:9px;color:var(--text2);">${s.completion_rate}%</div>
             <div style="width:100%;height:${h}px;background:${color};border-radius:3px 3px 0 0;min-height:4px;"></div>
@@ -2846,12 +2844,12 @@ async function renderProgress() {
 // ─── ONBOARDING ────────────────────────────────────────────────
 const OB_DEFAULT_HATS = [
   { name: 'Personal', icon: '✨', color: '#a78bfa' },
-  { name: 'Family', icon: '🏠', color: '#34d399' },
+  { name: 'Family', icon: '🏠', color: '#22d3ee' },
 ];
 
 const OB_DEFAULT_METRICS = [
   { name: 'Work', icon: '💼', color: '#60a5fa', goal: 5, keywords: ['meeting','email','client','invoice','audit','booking'], active: true },
-  { name: 'Family', icon: '🏠', color: '#34d399', goal: 2, keywords: ['family','home','kids','spouse','partner','baby'], active: true },
+  { name: 'Family', icon: '🏠', color: '#22d3ee', goal: 2, keywords: ['family','home','kids','spouse','partner','baby'], active: true },
   { name: 'Health', icon: '💪', color: '#fb923c', goal: 3, keywords: ['workout','gym','exercise','run','walk','doctor','health'], active: true },
   { name: 'Faith', icon: '🙏', color: '#a78bfa', goal: 1, keywords: ['church','pray','devotion','bible','worship','faith','spiritual'], active: true },
   { name: 'Personal Finance', icon: '💰', color: '#fbbf24', goal: 2, keywords: ['invoice','payment','bill','budget','tax','money'], active: true },
@@ -2896,7 +2894,7 @@ function renderObHats() {
 }
 
 function addObHat() {
-  const colors = ['#f472b6','#60a5fa','#34d399','#fb923c','#a78bfa','#fbbf24','#38bdf8'];
+  const colors = ['#f472b6','#60a5fa','#22d3ee','#fb923c','#a78bfa','#fbbf24','#38bdf8'];
   const icons = ['📁','🎯','🚀','⚡','🌟','💡','🔥'];
   obHats.push({ 
     name: '', 
@@ -2983,7 +2981,7 @@ function toggleAddCategory() {
 
 function quickAddCategory(name, icon, goal) {
   const suggestion = CAT_SUGGESTIONS.find(s => s.name === name);
-  const colors = ['#f472b6','#60a5fa','#34d399','#fb923c','#a78bfa','#fbbf24','#38bdf8','#6b7280','#10b981'];
+  const colors = ['#f472b6','#60a5fa','#22d3ee','#fb923c','#a78bfa','#fbbf24','#38bdf8','#6b7280','#10b981'];
   obMetrics.push({
     name,
     icon,
@@ -3004,7 +3002,7 @@ function addCustomCategory() {
   const goal = parseInt(document.getElementById('newCatGoal').value) || 1;
   if (!name) { showToast('⚠️ Enter a category name'); return; }
   
-  const colors = ['#f472b6','#60a5fa','#34d399','#fb923c','#a78bfa','#fbbf24','#38bdf8','#6b7280','#10b981'];
+  const colors = ['#f472b6','#60a5fa','#22d3ee','#fb923c','#a78bfa','#fbbf24','#38bdf8','#6b7280','#10b981'];
   obMetrics.push({
     name,
     icon,
@@ -3068,7 +3066,7 @@ function copyAiPrompt() {
   navigator.clipboard.writeText(text).then(() => {
     if (btn) {
       btn.innerHTML = '✓ Copied!';
-      btn.style.color = 'var(--personal)';
+      btn.style.color = 'var(--done)';
       btn.style.borderColor = 'var(--personal)';
     }
   });

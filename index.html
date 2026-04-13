@@ -1743,7 +1743,15 @@ async function runAiTask(taskId, mode = 'complete') {
   }
 
   document.getElementById('aiModalTask').textContent = task.cleaned_task || task.content;
-  document.getElementById('aiModalResult').textContent = 'Claude is working on this…';
+  document.getElementById('aiModalResult').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:8px 0;">
+      <div style="display:flex;gap:4px;">
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s infinite;"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s 0.2s infinite;"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s 0.4s infinite;"></div>
+      </div>
+      Claude is thinking…
+    </div>`;
   document.getElementById('tweakInput').value = '';
   document.getElementById('aiModal').style.display = 'flex';
 
@@ -1773,7 +1781,17 @@ Task: ${task.cleaned_task || task.content}`;
 async function callAiAndDisplay(prompt) {
   const apiKey = localStorage.getItem('apiKey');
   const resultEl = document.getElementById('aiModalResult');
-  resultEl.textContent = 'Claude is working on this…';
+  resultEl.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;padding:8px 0;">
+      <div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;">
+        <div style="display:flex;gap:4px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s infinite;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s 0.2s infinite;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s 0.4s infinite;"></div>
+        </div>
+        Claude is thinking…
+      </div>
+    </div>`;
 
   try {
     const response = await fetch('/api/process', {
@@ -1784,16 +1802,16 @@ async function callAiAndDisplay(prompt) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message);
     const text = data.content[0].text;
-    // Render markdown
+    // Clean markdown rendering
     resultEl.innerHTML = text
-      .replace(/^### (.+)$/gm, '<div style="font-family:\'Syne\',sans-serif;font-weight:700;font-size:14px;margin:14px 0 6px;">$1</div>')
-      .replace(/^## (.+)$/gm, '<div style="font-family:\'Syne\',sans-serif;font-weight:800;font-size:16px;margin:16px 0 8px;">$1</div>')
-      .replace(/^# (.+)$/gm, '<div style="font-family:\'Syne\',sans-serif;font-weight:800;font-size:18px;margin:16px 0 8px;">$1</div>')
+      .replace(/^### (.+)$/gm, '<div style="font-family:\'Syne\',sans-serif;font-weight:700;font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 4px;">$1</div>')
+      .replace(/^## (.+)$/gm, '<div style="font-family:\'Syne\',sans-serif;font-weight:700;font-size:15px;margin:12px 0 6px;">$1</div>')
+      .replace(/^# (.+)$/gm, '<div style="font-family:\'Syne\',sans-serif;font-weight:800;font-size:17px;margin:12px 0 6px;">$1</div>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/^[-•] (.+)$/gm, '<div style="padding-left:12px;margin:3px 0;">• $1</div>')
-      .replace(/^\d+\. (.+)$/gm, (m, p1, offset, str) => `<div style="padding-left:12px;margin:3px 0;">${m}</div>`)
-      .replace(/\n\n/g, '<br><br>')
+      .replace(/\*(.+?)\*/g, '<em style="color:var(--text2);">$1</em>')
+      .replace(/^[-•]\s(.+)$/gm, '<div style="display:flex;gap:6px;margin:2px 0;"><span style="color:var(--accent);flex-shrink:0;">·</span><span>$1</span></div>')
+      .replace(/^(\d+)\.\s(.+)$/gm, '<div style="display:flex;gap:6px;margin:2px 0;"><span style="color:var(--accent);flex-shrink:0;min-width:16px;">$1.</span><span>$2</span></div>')
+      .replace(/\n\n/g, '<div style="height:8px;"></div>')
       .replace(/\n/g, '<br>');
   } catch(e) {
     resultEl.textContent = 'Error: ' + e.message;

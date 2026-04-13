@@ -1645,7 +1645,10 @@ async function signInWithGoogle() {
     const { error } = await sbClient.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + window.location.pathname
+        redirectTo: window.location.origin + window.location.pathname,
+        queryParams: {
+          prompt: 'select_account',
+        },
       }
     });
     if (error) showToast('❌ Sign in failed: ' + error.message);

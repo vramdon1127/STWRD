@@ -2402,7 +2402,7 @@ async function renderStats() {
 
   let completed = [];
   try {
-    completed = await sbFetch(`tasks?status=eq.done&created_at=gte.${since}&order=completed_at.desc&limit=200`) || [];
+    completed = await sbFetch(`tasks?status=eq.done&user_id=eq.${currentUserId}&created_at=gte.${since}&order=completed_at.desc&limit=200`) || [];
   } catch(e) {}
 
   const today = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
@@ -2420,12 +2420,11 @@ async function renderStats() {
   const completedThisWeek = completed.filter(t => t.created_at >= weekAgoStr).length;
   const addedThisWeek = active.filter(t => t.created_at >= weekAgoStr).length + completedThisWeek;
   const completionRate = addedThisWeek > 0 ? Math.round((completedThisWeek / addedThisWeek) * 100) : 0;
-  const projData = [
-    { name: 'GNE', color: 'var(--gne)', count: active.filter(t => t.project === 'GNE').length },
-    { name: 'Caliber', color: 'var(--caliber)', count: active.filter(t => t.project === 'Caliber').length },
-    { name: 'Personal', color: 'var(--personal)', count: active.filter(t => t.project === 'Personal').length },
-    { name: 'ServeAnts', color: 'var(--servents)', count: active.filter(t => t.project === 'ServeAnts').length },
-  ];
+  const projData = userHats.map(hat => ({
+    name: hat.name,
+    color: hat.color || 'var(--accent)',
+    count: active.filter(t => t.project === hat.name).length
+  }));
   const maxProj = Math.max(...projData.map(p => p.count), 1);
   const totalCat = aiComplete + aiAssist + manual || 1;
   const aiPct = Math.round(((aiComplete + aiAssist) / totalCat) * 100);

@@ -1895,7 +1895,7 @@ async function saveTask(task) {
 }
 
 async function updateTask(id, updates) {
-  await sbFetch(`tasks?id=eq.${id}&user_id=eq.${currentUserId}`, 'PATCH', updates);
+  await sbFetch(`tasks?id=eq.${id}`, 'PATCH', updates);
 }
 
 async function deleteTask(id) {
@@ -2193,7 +2193,11 @@ async function toggleDone(taskId) {
   await updateTask(taskId, updates);
   if (newStatus === 'done') {
     tasks = tasks.filter(t => t.id !== taskId);
-    showToast('✓ Task completed');
+    if (viewingPartner) {
+      showToast(`✓ Done! You knocked one off ${partnerData.name}'s list 💪`);
+    } else {
+      showToast('✓ Task completed');
+    }
   } else {
     task.status = newStatus;
   }
@@ -2363,10 +2367,12 @@ function renderHatTasks() {
             ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date.split('-').slice(1).concat(task.due_date.split('-')[0]).join('/')}</span>` : ''}
           </div>
           <div class="task-actions">
+            ${viewingPartner ? `<span style="font-size:11px;color:var(--text2);padding:4px 0;">👆 Tap check to help out</span>` : `
             ${task.category === 'AI Complete' ? `<button class="task-action-btn ai-run" onclick="runAiTask('${task.id}','complete')">🤖 Run with AI</button>` : ''}
             ${task.category === 'AI Assist' ? `<button class="task-action-btn ai-run" onclick="runAiTask('${task.id}','assist')" style="background:rgba(56,189,248,0.15);color:var(--ai-assist);border-color:rgba(56,189,248,0.3);">🤝 Get AI Help</button>` : ''}
             <button class="task-action-btn" onclick="openEditModal('${task.id}')">✏️ Edit</button>
             <button class="task-action-btn danger" onclick="removeTask('${task.id}')">Delete</button>
+            `}
           </div>
           ${task.notes ? `<div style="margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.5;border-left:2px solid var(--accent);">📝 ${task.notes}</div>` : ''}
         </div>

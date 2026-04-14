@@ -1185,10 +1185,18 @@
   <div class="view" id="view-settings">
     <div class="settings-section">
       <div class="settings-row" style="flex-direction: column; align-items: flex-start; cursor: default;">
-        <div class="settings-label" style="margin-bottom: 4px; font-weight: 600;">Anthropic API Key</div>
-        <div class="settings-value">Required to process tasks with Claude AI</div>
-        <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-..." 
-          value="">
+        <div class="settings-label" style="margin-bottom: 8px; font-weight: 600;">🤖 AI Provider</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-bottom:12px;">
+          <button id="providerBtnClaude" onclick="switchProvider('claude')" style="padding:10px;border-radius:10px;border:2px solid var(--accent);background:rgba(124,111,239,0.15);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;transition:all 0.2s;">Claude</button>
+          <button id="providerBtnChatgpt" onclick="switchProvider('chatgpt')" style="padding:10px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;transition:all 0.2s;">ChatGPT</button>
+        </div>
+        <div class="settings-label" id="apiKeyLabel" style="margin-bottom: 4px; font-weight: 600;">Anthropic API Key</div>
+        <div class="settings-value" id="apiKeyDesc">Required to process tasks with Claude AI</div>
+        <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-..." value="">
+        <a id="apiKeyLink" href="https://console.anthropic.com/settings/keys" target="_blank" style="font-size:12px;color:var(--accent);margin-bottom:8px;display:block;">🔗 Get your Claude API key →</a>
+        <div style="background:rgba(124,111,239,0.08);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;font-size:12px;color:var(--text2);line-height:1.6;">
+          🔒 Your key is stored only on your device. We never see it — it goes straight from your phone to the AI provider. Think of it like batteries for the AI.
+        </div>
         <button class="save-btn" onclick="saveApiKey()">Save API Key</button>
       </div>
     </div>
@@ -2789,7 +2797,7 @@ function showView(name) {
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'stats') renderStats();
   if (name === 'progress') renderProgress();
-  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); renderKeywordEditor(); renderLifeAreasEditor(); }
+  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); renderKeywordEditor(); renderLifeAreasEditor(); initProviderToggle(); }
   if (name === 'today') renderToday();
 }
 
@@ -3179,14 +3187,63 @@ async function saveHatKnowledge() {
   }
 }
 
+function initProviderToggle() {
+  const provider = currentUserProfile?.preferred_ai || localStorage.getItem('stwrd-provider') || 'claude';
+  switchProvider(provider);
+  // Pre-fill the correct key
+  const key = provider === 'chatgpt'
+    ? (localStorage.getItem('apiKey_chatgpt') || '')
+    : (currentUserProfile?.anthropic_key || localStorage.getItem('apiKey_claude') || '');
+  const input = document.getElementById('apiKeyInput');
+  if (input && key) input.value = key;
+}
+
+function switchProvider(provider) {
+  const activeStyle = 'border:2px solid var(--accent);background:rgba(124,111,239,0.15);color:var(--accent);';
+  const inactiveStyle = 'border:2px solid var(--border);background:transparent;color:var(--text2);';
+  document.getElementById('providerBtnClaude').style.cssText = provider === 'claude' ? activeStyle : inactiveStyle;
+  document.getElementById('providerBtnChatgpt').style.cssText = provider === 'chatgpt' ? activeStyle : inactiveStyle;
+  const label = document.getElementById('apiKeyLabel');
+  const desc = document.getElementById('apiKeyDesc');
+  const input = document.getElementById('apiKeyInput');
+  const link = document.getElementById('apiKeyLink');
+  if (provider === 'chatgpt') {
+    label.textContent = 'OpenAI API Key';
+    desc.textContent = 'Required to process tasks with ChatGPT';
+    input.placeholder = 'sk-...';
+    link.href = 'https://platform.openai.com/api-keys';
+    link.textContent = '🔗 Get your ChatGPT API key → (then add $5 at platform.openai.com/settings/billing)';
+    // Load existing chatgpt key if any
+    const existing = currentUserProfile?.resend_key || localStorage.getItem('apiKey_chatgpt') || '';
+    input.value = existing;
+  } else {
+    label.textContent = 'Anthropic API Key';
+    desc.textContent = 'Required to process tasks with Claude AI';
+    input.placeholder = 'sk-ant-...';
+    link.href = 'https://console.anthropic.com/settings/keys';
+    link.textContent = '🔗 Get your Claude API key →';
+    const existing = currentUserProfile?.anthropic_key || localStorage.getItem('apiKey_claude') || '';
+    input.value = existing;
+  }
+  localStorage.setItem('stwrd-provider', provider);
+  if (currentUserProfile) currentUserProfile.preferred_ai = provider;
+  selectedAI = provider;
+}
+
 async function saveApiKey() {
   const key = document.getElementById('apiKeyInput').value.trim();
   if (!key) return;
+  const provider = localStorage.getItem('stwrd-provider') || currentUserProfile?.preferred_ai || 'claude';
   localStorage.setItem('apiKey', key);
+  localStorage.setItem(provider === 'chatgpt' ? 'apiKey_chatgpt' : 'apiKey_claude', key);
   try {
     // Upsert via direct fetch (Prefer: resolution=merge-duplicates)
     const sess = JSON.parse(localStorage.getItem('stwrd-auth') || '{}');
     const token = sess?.access_token || SUPABASE_KEY;
+    // Save key + provider to profile
+    const profileUpdate = { id: currentUserId, preferred_ai: provider };
+    if (provider === 'claude') profileUpdate.anthropic_key = key;
+    else profileUpdate.resend_key = key; // reuse resend_key col for chatgpt key temp storage
     await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
       method: 'POST',
       headers: {
@@ -3195,8 +3252,9 @@ async function saveApiKey() {
         'Content-Type': 'application/json',
         'Prefer': 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify({ id: currentUserId, anthropic_key: key }),
+      body: JSON.stringify(profileUpdate),
     });
+    if (currentUserProfile) { currentUserProfile.preferred_ai = provider; selectedAI = provider; }
   } catch(e) {}
   showToast('✓ API key saved');
 }

@@ -828,20 +828,20 @@
       </div>
     </div>
 
-    <!-- Step 3: Paste AI context -->
+    <!-- Step 3: Personal context -->
     <div id="ob-step-3" style="display:none;">
-      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">What does your AI know? 💬</div>
-      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:16px;">Your AI already knows a lot about you. Let's bring that into STWRD.</div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;position:relative;overflow:hidden;">
+      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Tell STWRD about yourself 🧠</div>
+      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:16px;">The more context STWRD has, the smarter it gets at sorting your tasks from day one.</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden;">
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📋 Ask your AI this right now:</div>
-        <div id="ob-ai-prompt-text" style="background:var(--surface2);border-radius:8px;padding:12px;font-size:13px;color:var(--text);line-height:1.6;font-style:italic;margin-bottom:10px;">"Summarize what you know about my life, work, family, and goals in 3-4 sentences."</div>
-        <button onclick="copyAiPrompt()" style="padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:rgba(124,111,239,0.12);color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">📋 Copy prompt</button>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;">About you <span style="color:var(--text2);font-weight:400;">(optional but powerful)</span></div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Your job, family situation, side hustles, goals — even a few sentences helps a lot.</div>
+        <textarea id="ob-ai-context" rows="5" placeholder="e.g. I'm a nurse and mom of 3, juggling hospital shifts, kids' activities, and a small Etsy shop on the side..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;resize:none;outline:none;line-height:1.5;"></textarea>
       </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Paste what it says <span style="color:var(--text2);font-weight:400;">(optional but powerful)</span></div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">STWRD will use this to personalize every AI interaction from day one.</div>
-        <textarea id="ob-ai-context" rows="5" placeholder="Paste your AI's response here..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;resize:none;outline:none;line-height:1.5;"></textarea>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">🤖 Already use Claude or ChatGPT?</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:8px;">Ask your AI tool: <span style="color:var(--text);font-style:italic;">"Summarize what you know about my life, work, family, and goals in 3-4 sentences."</span> Then paste the response above.</div>
+        <button onclick="copyAiPrompt()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">📋 Copy that prompt</button>
       </div>
       <div style="margin-bottom:24px;"></div>
       <div style="display:flex;gap:10px;">

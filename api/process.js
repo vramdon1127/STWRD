@@ -21,7 +21,11 @@ export default async function handler(req, res) {
     maxTokens = 800,
   } = req.body || {};
 
-  if (!apiKey) {
+  // For Claude, fall back to server-side env key if none provided
+  const resolvedApiKey = apiKey || (
+    (provider === 'chatgpt' || provider === 'openai') ? null : process.env.ANTHROPIC_API_KEY
+  );
+  if (!resolvedApiKey) {
     return res.status(400).json({ error: { message: 'Missing apiKey' } });
   }
   if (!prompt && !(Array.isArray(messages) && messages.length)) {
@@ -30,10 +34,10 @@ export default async function handler(req, res) {
 
   try {
     if (provider === 'chatgpt' || provider === 'openai') {
-      return await callOpenAI({ apiKey, prompt, systemPrompt, messages, maxTokens, res });
+      return await callOpenAI({ apiKey: resolvedApiKey, prompt, systemPrompt, messages, maxTokens, res });
     }
     // Default to Claude
-    return await callAnthropic({ apiKey, prompt, systemPrompt, messages, maxTokens, res });
+    return await callAnthropic({ apiKey: resolvedApiKey, prompt, systemPrompt, messages, maxTokens, res });
   } catch (e) {
     console.error('[/api/process] error:', e);
     return res.status(500).json({ error: { message: e.message || 'Internal error' } });

@@ -1319,6 +1319,14 @@
       <input type="date" id="editDueDate" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;">
     </div>
     <div style="margin-bottom:16px;">
+      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px;">RECURRENCE</label>
+      <select id="editRecurrence" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;">
+        <option value="none">🚫 One-time (no repeat)</option>
+        <option value="weekly">🔁 Weekly</option>
+        <option value="monthly">📅 Monthly</option>
+      </select>
+    </div>
+    <div style="margin-bottom:16px;">
       <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px;">NOTES (optional)</label>
       <textarea id="editNotes" rows="3" placeholder="Add context, updates, or follow-up details..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;resize:none;outline:none;"></textarea>
     </div>
@@ -1964,6 +1972,7 @@ CATEGORY: [AI Complete OR AI Assist OR Manual]
 PROJECT: [${projectNames}]
 PRIORITY: [P1 OR P2 OR P3 OR P4]
 DUE: [YYYY-MM-DD if a date is mentioned, otherwise none]
+RECUR: [weekly OR monthly OR none — weekly if task repeats every week like laundry/groceries, monthly if repeats monthly like bills/rent, none otherwise]
 LIFE: [${lifeAreaNames}]
 REASON: [one short sentence why]
 
@@ -2000,6 +2009,9 @@ Added by: ${currentUser}`;
     const dueRaw = get('DUE');
     const dueDate = dueRaw && dueRaw !== 'none' && dueRaw.match(/\d{4}-\d{2}-\d{2}/) ? dueRaw.match(/\d{4}-\d{2}-\d{2}/)[0] : null;
 
+    const recurRaw = get('RECUR') || 'none';
+    const recurrence = ['weekly','monthly'].includes(recurRaw.toLowerCase()) ? recurRaw.toLowerCase() : 'none';
+
     const task = {
       content: raw,
       cleaned_task: get('TASK'),
@@ -2007,6 +2019,7 @@ Added by: ${currentUser}`;
       project: get('PROJECT'),
       priority: get('PRIORITY'),
       due_date: dueDate,
+      recurrence: recurrence,
       life_area: get('LIFE') || null,
       status: 'todo',
       added_by: currentUser
@@ -2188,18 +2201,43 @@ async function toggleDone(taskId) {
   const task = tasks.find(t => t.id === taskId);
   if (!task) return;
   const newStatus = task.status === 'done' ? 'todo' : 'done';
-  const updates = { status: newStatus };
-  if (newStatus === 'done') updates.completed_at = new Date().toISOString();
-  await updateTask(taskId, updates);
-  if (newStatus === 'done') {
+
+  if (newStatus === 'done' && task.recurrence && task.recurrence !== 'none') {
+    // Recurring task — reset with next due date instead of marking done
+    const today = new Date();
+    const nextDate = new Date(today);
+    if (task.recurrence === 'weekly') nextDate.setDate(today.getDate() + 7);
+    else if (task.recurrence === 'monthly') nextDate.setMonth(today.getMonth() + 1);
+    const nextDue = nextDate.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
+
+    await updateTask(taskId, {
+      status: 'todo',
+      due_date: nextDue,
+      completed_at: new Date().toISOString()
+    });
+
+    // Hide it from the current view until it's due
     tasks = tasks.filter(t => t.id !== taskId);
+    const recurLabel = task.recurrence === 'weekly' ? 'next week' : 'next month';
     if (viewingPartner) {
-      showToast(`✓ Done! You knocked one off ${partnerData.name}'s list 💪`);
+      showToast(`✓ Done! Resets for ${partnerData.name} ${recurLabel} 💪`);
     } else {
-      showToast('✓ Task completed');
+      showToast(`✓ Done! Repeats ${recurLabel} 🔁`);
     }
   } else {
-    task.status = newStatus;
+    const updates = { status: newStatus };
+    if (newStatus === 'done') updates.completed_at = new Date().toISOString();
+    await updateTask(taskId, updates);
+    if (newStatus === 'done') {
+      tasks = tasks.filter(t => t.id !== taskId);
+      if (viewingPartner) {
+        showToast(`✓ Done! You knocked one off ${partnerData.name}'s list 💪`);
+      } else {
+        showToast('✓ Task completed');
+      }
+    } else {
+      task.status = newStatus;
+    }
   }
   renderTasks();
   if (currentHat) renderHatTasks();
@@ -2365,6 +2403,7 @@ function renderHatTasks() {
             ${task.priority ? `<span class="tag ${priClass}">${task.priority}</span>` : ''}
             ${task.added_by ? `<span class="tag tag-added-by">${task.added_by}</span>` : ''}
             ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date.split('-').slice(1).concat(task.due_date.split('-')[0]).join('/')}</span>` : ''}
+            ${task.recurrence && task.recurrence !== 'none' ? `<span class="tag" style="background:rgba(16,185,129,0.1);color:var(--done);">${task.recurrence === 'weekly' ? '🔁 Weekly' : '📅 Monthly'}</span>` : ''}
           </div>
           <div class="task-actions">
             ${viewingPartner ? `<span style="font-size:11px;color:var(--text2);padding:4px 0;">👆 Tap check to help out</span>` : `
@@ -2795,6 +2834,7 @@ function openEditModal(taskId) {
     btn.style.color = btn.textContent === editingPriority ? 'white' : `var(--${btn.textContent.toLowerCase()})`;
   });
   document.getElementById('editDueDate').value = task.due_date || '';
+  document.getElementById('editRecurrence').value = task.recurrence || 'none';
   document.getElementById('editNotes').value = task.notes || '';
   document.getElementById('editModal').style.display = 'flex';
   // iOS pull-to-refresh lock
@@ -2860,13 +2900,15 @@ async function saveEdit() {
   // Update the task
   const newDueDate = document.getElementById('editDueDate').value || null;
   const newNotes = document.getElementById('editNotes').value.trim() || null;
+  const newRecurrence = document.getElementById('editRecurrence').value || 'none';
   const updates = {
     cleaned_task: newName,
     project: newProject,
     category: newCategory,
     priority: newPriority,
     due_date: newDueDate,
-    notes: newNotes
+    notes: newNotes,
+    recurrence: newRecurrence
   };
 
   await updateTask(editingTaskId, updates);
@@ -3006,6 +3048,7 @@ function showLifeDrilldown(idx) {
             ${task.category ? `<span class="tag ${catClass}">${task.category}</span>` : ''}
             ${task.priority ? `<span class="tag ${priClass}">${task.priority}</span>` : ''}
             ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date.split('-').slice(1).concat(task.due_date.split('-')[0]).join('/')}</span>` : ''}
+            ${task.recurrence && task.recurrence !== 'none' ? `<span class="tag" style="background:rgba(16,185,129,0.1);color:var(--done);">${task.recurrence === 'weekly' ? '🔁 Weekly' : '📅 Monthly'}</span>` : ''}
           </div>
           ${!isDone ? `<div class="task-actions">
             ${task.category === 'AI Complete' ? `<button class="task-action-btn ai-run" onclick="runAiTask('${task.id}','complete')">🤖 Run with AI</button>` : ''}
@@ -3051,6 +3094,7 @@ function showDrilldown(title, filterFn) {
             ${task.category ? `<span class="tag ${catClass}">${task.category}</span>` : ''}
             ${task.priority ? `<span class="tag ${priClass}">${task.priority}</span>` : ''}
             ${task.due_date ? `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${task.due_date.split('-').slice(1).concat(task.due_date.split('-')[0]).join('/')}</span>` : ''}
+            ${task.recurrence && task.recurrence !== 'none' ? `<span class="tag" style="background:rgba(16,185,129,0.1);color:var(--done);">${task.recurrence === 'weekly' ? '🔁 Weekly' : '📅 Monthly'}</span>` : ''}
           </div>
           <div class="task-actions">
             <button class="task-action-btn" onclick="openEditModal('${task.id}')">✏️ Edit</button>

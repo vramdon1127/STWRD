@@ -358,20 +358,31 @@
   }
 
   .task-check {
-    width: 22px;
-    height: 22px;
-    border-radius: 7px;
+    position: relative;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
     border: 2px solid var(--border);
     background: transparent;
     cursor: pointer;
     flex-shrink: 0;
-    margin-top: 1px;
+    margin-top: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .task-check::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    bottom: -8px;
+    left: -8px;
   }
   .task-check:hover { border-color: var(--accent3); }
+  .task-check:active { transform: scale(0.92); }
   .task-check.checked {
     background: var(--accent3);
     border-color: var(--accent3);
@@ -2387,7 +2398,7 @@ function renderHatTasks() {
     <div class="task-card" id="task-${task.id}">
       <div class="task-card-top">
         <div class="task-check ${task.status === 'done' ? 'checked' : ''}" onclick="toggleDone('${task.id}')">
-          ${task.status === 'done' ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          ${task.status === 'done' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
         </div>
         <div class="task-body">
           <div class="task-title">${task.cleaned_task || task.content}</div>
@@ -3031,7 +3042,7 @@ function showLifeDrilldown(idx) {
     return `<div class="task-card ${isDone ? 'done' : ''}" id="task-${task.id}">
       <div class="task-card-top">
         <div class="task-check ${isDone ? 'checked' : ''}" onclick="toggleDone('${task.id}')">
-          ${isDone ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          ${isDone ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
         </div>
         <div class="task-body">
           <div class="task-title">${task.cleaned_task || task.content}</div>
@@ -3077,7 +3088,7 @@ function showDrilldown(title, filterFn) {
     <div class="task-card">
       <div class="task-card-top">
         <div class="task-check ${task.status === 'done' ? 'checked' : ''}" onclick="toggleDone('${task.id}');renderDrilldownAfterToggle('${task.id}')">
-          ${task.status === 'done' ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          ${task.status === 'done' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
         </div>
         <div class="task-body">
           <div class="task-title">${task.cleaned_task || task.content}</div>
@@ -3125,7 +3136,7 @@ async function showCompletedDrilldown(since) {
       <div class="task-card" style="opacity:0.8;">
         <div class="task-card-top">
           <div class="task-check checked">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
           <div class="task-body">
             <div class="task-title" style="text-decoration:line-through;color:var(--text2);">${task.cleaned_task || task.content}</div>

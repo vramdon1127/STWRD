@@ -1367,6 +1367,7 @@
       <!-- Copy row -->
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <button onclick="copyAiResult()" id="copyResultBtn" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;">📋 Copy</button>
+        <button onclick="copyAiMessageOnly()" id="copyMessageOnlyBtn" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;">✂️ Message only</button>
         <button onclick="closeAiModal(true)" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--done);color:#0a0a0f;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">✓ Done</button>
       </div>
       <!-- Tweak bar -->
@@ -2263,6 +2264,64 @@ function copyAiResult() {
     btn.style.borderColor = 'var(--done)';
     setTimeout(() => {
       btn.textContent = '📋 Copy';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+
+// Strip Claude's framing/preamble so the user gets just the deliverable.
+// Stopgap until we can update the AI Complete system prompt (gated on a test battery).
+function stripAiPreamble(raw) {
+  if (!raw) return '';
+  const introPatterns = [
+    /^(sure|okay|ok|got it|absolutely|of course|great|perfect)[!,.\s]/i,
+    /^here('s| is| are)\b/i,
+    /^below\b/i,
+    /^i('ve| have)\s+(drafted|written|prepared|put together|composed|created)/i,
+    /^i'?ll\s+(draft|write|prepare|put together|compose|create)/i,
+    /^let me\b/i,
+    /^this\s+(is|draft|message|email|text|post)/i,
+    /^(draft|message|email|text|post)[:\s]/i,
+    /^feel free\b/i,
+    /^hope this helps\b/i,
+  ];
+  const lines = raw.split('\n');
+  let start = 0;
+  // Skip leading intro lines (and the blank line after them, if any).
+  while (start < lines.length) {
+    const line = lines[start].trim();
+    if (line === '') { start++; continue; }
+    if (introPatterns.some(re => re.test(line))) { start++; continue; }
+    break;
+  }
+  // Trim trailing "hope this helps" / "let me know" style outros.
+  const outroPatterns = [
+    /^(let me know|hope (this|that) helps|feel free|happy to|want me to|would you like)\b/i,
+  ];
+  let end = lines.length;
+  while (end > start) {
+    const line = lines[end - 1].trim();
+    if (line === '') { end--; continue; }
+    if (outroPatterns.some(re => re.test(line))) { end--; continue; }
+    break;
+  }
+  const stripped = lines.slice(start, end).join('\n').trim();
+  // Safety net: if parsing ate everything, fall back to the raw text.
+  return stripped || raw.trim();
+}
+
+function copyAiMessageOnly() {
+  const lastAssistant = [...aiConversation.messages].reverse().find(m => m.role === 'assistant');
+  const raw = (lastAssistant?.content ?? document.getElementById('aiModalResult').innerText ?? '').trim();
+  const text = stripAiPreamble(raw);
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyMessageOnlyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.style.color = 'var(--done)';
+    btn.style.borderColor = 'var(--done)';
+    setTimeout(() => {
+      btn.textContent = '✂️ Message only';
       btn.style.color = '';
       btn.style.borderColor = '';
     }, 2000);

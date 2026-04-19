@@ -2306,7 +2306,11 @@ function stripAiPreamble(raw) {
     if (outroPatterns.some(re => re.test(line))) { end--; continue; }
     break;
   }
-  const stripped = lines.slice(start, end).join('\n').trim();
+  // Drop decorative separator lines (---, ===, ___, ***, ~~~, etc.).
+  const separatorRe = /^[-=_*~]{3,}$/;
+  const kept = lines.slice(start, end).filter(line => !separatorRe.test(line.trim()));
+  // Collapse any 3+ consecutive blank lines that the separator removal leaves behind.
+  const stripped = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   // Safety net: if parsing ate everything, fall back to the raw text.
   return stripped || raw.trim();
 }

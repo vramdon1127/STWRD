@@ -328,6 +328,24 @@
     color: var(--text2);
   }
 
+  /* Task list date-window section headers — quiet, minimal. */
+  .task-section-header {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin: 14px 4px 8px;
+  }
+  .task-section-header:first-child { margin-top: 0; }
+  .task-section-header .count {
+    opacity: 0.6;
+    margin-left: 4px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
   /* TASK CARD */
   .task-card {
     background: var(--surface);
@@ -2619,6 +2637,59 @@ function dueBadgeHTML(task) {
   return `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${label}</span>`;
 }
 
+// Single source of truth for date-window classification.
+// Order matters: completed wins, then overdue, then today, then near-future, then far-future, then undated.
+function taskDateSection(task) {
+  if (task.status === 'done' || task.completed_at) return 'done';
+  if (isOverdue(task)) return 'overdue';
+  if (!task.due_date) return 'no_date';
+  const today = todayStr();
+  if (task.due_date === today) return 'today';
+  const delta = daysBetween(today, task.due_date);
+  if (delta >= 1 && delta <= 6) return 'this_week';
+  return 'later';
+}
+const TASK_SECTION_ORDER = ['overdue', 'today', 'this_week', 'later', 'no_date', 'done'];
+const TASK_SECTION_LABELS = {
+  overdue: 'Overdue',
+  today: 'Today',
+  this_week: 'This Week',
+  later: 'Later',
+  no_date: 'No due date',
+  done: 'Completed',
+};
+// Sort within a section: priority ASC, due_date ASC NULLS LAST.
+// No overdue-float tier — the section itself expresses that.
+// No done-sink tier — the Completed section itself expresses that.
+function sortWithinSection(list) {
+  return [...list].sort((a, b) => {
+    const pr = priorityRank(a) - priorityRank(b);
+    if (pr !== 0) return pr;
+    const aDue = a.due_date || null;
+    const bDue = b.due_date || null;
+    if (aDue === bDue) return 0;
+    if (!aDue) return 1;
+    if (!bDue) return -1;
+    return aDue < bDue ? -1 : 1;
+  });
+}
+// Returns [{ key, label, count, tasks }, ...] in display order; empty sections omitted.
+function groupTasksBySections(list) {
+  const buckets = { overdue: [], today: [], this_week: [], later: [], no_date: [], done: [] };
+  list.forEach(t => buckets[taskDateSection(t)].push(t));
+  return TASK_SECTION_ORDER
+    .filter(k => buckets[k].length > 0)
+    .map(k => ({
+      key: k,
+      label: TASK_SECTION_LABELS[k],
+      count: buckets[k].length,
+      tasks: sortWithinSection(buckets[k]),
+    }));
+}
+function sectionHeaderHTML(section) {
+  return `<div class="task-section-header">${section.label}<span class="count">· ${section.count}</span></div>`;
+}
+
 let currentHat = null;
 let currentHatFilter = 'all';
 let selectionMode = false;
@@ -2732,7 +2803,6 @@ function renderHatTasks() {
   const list = document.getElementById('hatTaskList');
   let filtered = tasks.filter(t => t.project === currentHat);
   if (currentHatFilter !== 'all') filtered = filtered.filter(t => t.category === currentHatFilter);
-  filtered = sortByPriority(filtered);
 
   if (filtered.length === 0) {
     list.innerHTML = `
@@ -2744,7 +2814,7 @@ function renderHatTasks() {
     return;
   }
 
-  list.innerHTML = filtered.map(task => {
+  const renderCard = (task) => {
     const catClass = `tag-cat-${(task.category || '').toLowerCase().replace(/ /g,'-')}`;
     const priClass = `tag-${(task.priority || 'p3').toLowerCase()}`;
     const priCard = priCardClass(task);
@@ -2780,7 +2850,11 @@ function renderHatTasks() {
         </div>
       </div>
     </div>`;
-  }).join('');
+  };
+
+  list.innerHTML = groupTasksBySections(filtered)
+    .map(sec => sectionHeaderHTML(sec) + sec.tasks.map(renderCard).join(''))
+    .join('');
   renderSelectionChrome();
 }
 
@@ -3577,8 +3651,6 @@ function showLifeDrilldown(idx) {
     const text = ((t.cleaned_task || t.content || '') + ' ' + (t.project || '')).toLowerCase();
     return keywords.some(k => matchesKeyword(text, k));
   });
-  const sorted = sortByPriority(filtered);
-
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('view-drilldown').classList.add('active');
@@ -3586,12 +3658,12 @@ function showLifeDrilldown(idx) {
   document.getElementById('drilldownTitle').textContent = cat.name + ' Tasks';
 
   const list = document.getElementById('drilldownList');
-  if (sorted.length === 0) {
+  if (filtered.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✨</div><div class="empty-state-title">No ${cat.name} tasks this week</div></div>`;
     return;
   }
   const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)', Family: 'var(--family)' };
-  list.innerHTML = sorted.map(task => {
+  const renderCard = (task) => {
     const isDone = task.status === 'done';
     const catClass = `tag-cat-${(task.category || '').toLowerCase().replace(/ /g,'-')}`;
     const priClass = `tag-${(task.priority || 'p3').toLowerCase()}`;
@@ -3619,7 +3691,10 @@ function showLifeDrilldown(idx) {
         </div>
       </div>
     </div>`;
-  }).join('');
+  };
+  list.innerHTML = groupTasksBySections(filtered)
+    .map(sec => sectionHeaderHTML(sec) + sec.tasks.map(renderCard).join(''))
+    .join('');
 }
 
 function showDrilldown(title, filterFn) {
@@ -3629,7 +3704,7 @@ function showDrilldown(title, filterFn) {
   document.getElementById('nav-stats').classList.add('active');
   document.getElementById('drilldownTitle').textContent = title;
 
-  const filtered = sortByPriority(tasks.filter(filterFn));
+  const filtered = tasks.filter(filterFn);
   const list = document.getElementById('drilldownList');
 
   if (filtered.length === 0) {
@@ -3637,8 +3712,8 @@ function showDrilldown(title, filterFn) {
     return;
   }
 
-  list.innerHTML = filtered.map(task => {
-    const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
+  const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
+  const renderCard = (task) => {
     const catClass = `tag-cat-${(task.category || '').toLowerCase().replace(/ /g,'-')}`;
     const priClass = `tag-${(task.priority || 'p3').toLowerCase()}`;
     const priCard = priCardClass(task);
@@ -3665,7 +3740,10 @@ function showDrilldown(title, filterFn) {
         </div>
       </div>
     </div>`;
-  }).join('');
+  };
+  list.innerHTML = groupTasksBySections(filtered)
+    .map(sec => sectionHeaderHTML(sec) + sec.tasks.map(renderCard).join(''))
+    .join('');
 }
 
 async function showCompletedDrilldown(since) {

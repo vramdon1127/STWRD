@@ -2547,10 +2547,25 @@ const HATS = [
 // PROJECTS alias for backward compatibility
 const PROJECTS = HATS;
 
-// Color lookup helper
-function hatColor(name) {
-  const map = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)', Family: 'var(--family)' };
-  return map[name] || 'var(--accent)';
+// Color lookup for a task's project. Reads the per-user color stored on
+// userHats[] (set during onboarding's assignHatPersonality), so every user
+// sees their own palette — not just the hardcoded Vijay defaults.
+// Falls back to the legacy built-in palette for default project names,
+// then to accent-purple for unknown projects. Safe when userHats is
+// undefined (pre-load or partner view without loaded hats).
+const LEGACY_PROJECT_COLORS = {
+  GNE: 'var(--gne)',
+  Caliber: 'var(--caliber)',
+  Personal: 'var(--personal)',
+  ServeAnts: 'var(--servents)',
+  Family: 'var(--family)',
+};
+function projectColor(name) {
+  if (!name) return 'var(--accent)';
+  const hats = Array.isArray(userHats) ? userHats : [];
+  const hit = hats.find(h => h?.name === name);
+  if (hit?.color) return hit.color;
+  return LEGACY_PROJECT_COLORS[name] || 'var(--accent)';
 }
 
 // Priority sort: completed sink to bottom, then P1→P4, then null/unknown.
@@ -3662,13 +3677,12 @@ function showLifeDrilldown(idx) {
     list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✨</div><div class="empty-state-title">No ${cat.name} tasks this week</div></div>`;
     return;
   }
-  const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)', Family: 'var(--family)' };
   const renderCard = (task) => {
     const isDone = task.status === 'done';
     const catClass = `tag-cat-${(task.category || '').toLowerCase().replace(/ /g,'-')}`;
     const priClass = `tag-${(task.priority || 'p3').toLowerCase()}`;
     const priCard = priCardClass(task);
-    const projColor = projColors[task.project] || 'var(--accent)';
+    const projColor = projectColor(task.project);
     return `<div class="task-card ${isDone ? 'done' : ''}${priCard ? ' ' + priCard : ''}" id="task-${task.id}">
       <div class="task-card-top">
         <div class="task-check ${isDone ? 'checked' : ''}" onclick="toggleDone('${task.id}')">
@@ -3712,12 +3726,11 @@ function showDrilldown(title, filterFn) {
     return;
   }
 
-  const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
   const renderCard = (task) => {
     const catClass = `tag-cat-${(task.category || '').toLowerCase().replace(/ /g,'-')}`;
     const priClass = `tag-${(task.priority || 'p3').toLowerCase()}`;
     const priCard = priCardClass(task);
-    const projColor = projColors[task.project] || 'var(--accent)';
+    const projColor = projectColor(task.project);
     return `
     <div class="task-card${priCard ? ' ' + priCard : ''}">
       <div class="task-card-top">
@@ -3764,10 +3777,8 @@ async function showCompletedDrilldown(since) {
       return;
     }
 
-    const projColors = { GNE: 'var(--gne)', Caliber: 'var(--caliber)', Personal: 'var(--personal)', ServeAnts: 'var(--servents)' };
-
     list.innerHTML = completed.map(task => {
-      const projColor = projColors[task.project] || 'var(--accent)';
+      const projColor = projectColor(task.project);
       const completedDate = task.completed_at ? new Date(task.completed_at).toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'America/Chicago'}) : '';
       return `
       <div class="task-card" style="opacity:0.8;">

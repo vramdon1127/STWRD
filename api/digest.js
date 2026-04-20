@@ -67,6 +67,24 @@ function buildUserLifeCategories(rows) {
   });
 }
 
+// Resolve a project name → hex color for the email template.
+// CSS variables don't render in email clients, so we force hex: prefer the
+// user's stored per-project color (written during onboarding), fall back to
+// the built-in defaults for legacy project names, then to accent-purple.
+const LEGACY_PROJECT_HEX = {
+  GNE: '#f472b6',
+  Caliber: '#60a5fa',
+  Personal: '#34d399',
+  ServeAnts: '#fb923c',
+  Family: '#22d3ee',
+};
+function projectHexFor(name, colorByName) {
+  if (!name) return '#7c6fef';
+  const stored = colorByName ? colorByName[name] : null;
+  if (stored && stored.startsWith('#')) return stored;
+  return LEGACY_PROJECT_HEX[name] || '#7c6fef';
+}
+
 export default async function handler(req, res) {
   // Allow manual trigger via POST (for testing), cron hits GET
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -154,6 +172,15 @@ async function sendDigestToUser(profile, resendKey) {
       true
     ) || [];
     const lifeCategories = buildUserLifeCategories(userCategoryRows);
+
+    // Per-user project color map, used for the project dots next to Due Today
+    // items. Matches what the in-app drilldowns render.
+    const userProjectRows = await sbFetch(
+      `projects?user_id=eq.${userId}&order=sort_order.asc`,
+      true
+    ) || [];
+    const projectColorByName = {};
+    userProjectRows.forEach(p => { if (p?.name) projectColorByName[p.name] = p.color || null; });
 
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
@@ -255,7 +282,7 @@ FOCUS: [your recommendation here]`;
 
     const dueTodayHtml = dueTodayTasks.length > 0 
       ? dueTodayTasks.slice(0, 5).map(t => {
-          const projColor = { GNE: '#f472b6', Caliber: '#60a5fa', Personal: '#34d399', ServeAnts: '#fb923c' }[t.project] || '#7c6fef';
+          const projColor = projectHexFor(t.project, projectColorByName);
           return `<tr>
             <td style="padding:5px 0;">
               <span style="display:inline-block;width:8px;height:8px;background:${projColor};border-radius:50%;margin-right:8px;"></span>

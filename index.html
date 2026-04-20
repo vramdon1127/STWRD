@@ -878,29 +878,6 @@
       <button onclick="obNextSkip2()" style="width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Let's build it →</button>
     </div>
 
-    <!-- Step 2: Which AI do you use -->
-    <div id="ob-step-2" style="display:none;">
-      <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Your AI 🤖</div>
-      <div style="color:var(--text2);font-size:15px;line-height:1.6;margin-bottom:24px;">Which AI do you already use? STWRD will work alongside it.</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-        <button onclick="selectAI('claude',this)" class="ai-select-btn" style="padding:20px 14px;border-radius:14px;border:2px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all 0.2s;text-align:center;">
-          <div style="font-size:28px;margin-bottom:8px;">🧠</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">Claude</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">by Anthropic</div>
-        </button>
-        <button onclick="selectAI('chatgpt',this)" class="ai-select-btn" style="padding:20px 14px;border-radius:14px;border:2px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all 0.2s;text-align:center;">
-          <div style="font-size:28px;margin-bottom:8px;">⚡</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;">ChatGPT</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px;">by OpenAI</div>
-        </button>
-      </div>
-      <button onclick="selectAI('both',this)" class="ai-select-btn" style="width:100%;padding:14px;border-radius:14px;border:2px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all 0.2s;margin-bottom:32px;font-family:'DM Sans',sans-serif;font-size:14px;">Both / Not sure yet</button>
-      <div style="display:flex;gap:10px;">
-        <button onclick="obBack(2)" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
-        <button onclick="obNext(2)" id="ob-2-next" style="flex:2;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Continue →</button>
-      </div>
-    </div>
-
     <!-- Step 3: Personal context -->
     <div id="ob-step-3" style="display:none;">
       <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Tell STWRD about yourself 🧠</div>
@@ -4525,39 +4502,6 @@ function toggleMetric(i) {
 
 let selectedAI = 'claude';
 
-function selectAI(ai, btn) {
-  selectedAI = ai;
-  document.querySelectorAll('.ai-select-btn').forEach(b => {
-    b.style.borderColor = 'var(--border)';
-    b.style.background = 'var(--surface)';
-  });
-  btn.style.borderColor = 'var(--accent)';
-  btn.style.background = 'rgba(124,111,239,0.1)';
-  // Update Step 6 API instructions based on choice
-  updateApiInstructions();
-}
-
-function updateApiInstructions() {
-  const label = document.getElementById('ob-api-label');
-  const help = document.getElementById('ob-api-help');
-  const link = document.getElementById('ob-api-link');
-  const input = document.getElementById('ob-apikey');
-  if (!label) return;
-  if (selectedAI === 'chatgpt') {
-    label.textContent = 'OpenAI API Key';
-    help.textContent = '1. Go to platform.openai.com → API keys → Create new key  2. Paste it below';
-    link.textContent = '→ Get your OpenAI key here';
-    link.href = 'https://platform.openai.com/api-keys';
-    input.placeholder = 'sk-...';
-  } else {
-    label.textContent = 'Anthropic API Key';
-    help.textContent = '1. Go to console.anthropic.com → API keys → Create key  2. Paste it below';
-    link.textContent = '→ Get your Claude key here';
-    link.href = 'https://console.anthropic.com';
-    input.placeholder = 'sk-ant-...';
-  }
-}
-
 function copyAiPrompt() {
   const text = 'Summarize what you know about my life, work, family, and goals in 3-4 sentences.';
   const btn = document.querySelector('[onclick="copyAiPrompt()"]');
@@ -4588,40 +4532,6 @@ async function resetJourney() {
     if (document.getElementById('view-progress').classList.contains('active')) renderProgress();
   } catch(e) {
     showToast('❌ Could not reset: ' + e.message);
-  }
-}
-
-function renderLifeGoalsEditor() {
-  const el = document.getElementById('lifeGoalsEditor');
-  if (!el) return;
-  const cats = userLifeCategories.length > 0 ? userLifeCategories : [];
-  if (cats.length === 0) {
-    el.innerHTML = '<div style="font-size:13px;color:var(--text2);">No life categories set up yet.</div>';
-    return;
-  }
-  el.innerHTML = cats.map(cat => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
-      <div style="font-size:14px;">${cat.icon || '⚖️'} ${cat.name}</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button onclick="updateLifeGoal('${cat.id}', ${cat.goal - 1})" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">−</button>
-        <span id="goal-${cat.id}" style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;min-width:24px;text-align:center;">${cat.goal}</span>
-        <button onclick="updateLifeGoal('${cat.id}', ${cat.goal + 1})" style="width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">+</button>
-        <span style="font-size:11px;color:var(--text2);">tasks/wk</span>
-      </div>
-    </div>`).join('');
-}
-
-async function updateLifeGoal(catId, newGoal) {
-  if (newGoal < 1 || newGoal > 20) return;
-  const cat = userLifeCategories.find(c => c.id === catId);
-  if (!cat) return;
-  cat.goal = newGoal;
-  document.getElementById(`goal-${catId}`).textContent = newGoal;
-  try {
-    await sbFetch(`life_categories?id=eq.${catId}&user_id=eq.${currentUserId}`, 'PATCH', { goal: newGoal });
-    showToast(`✓ ${cat.name} goal updated`);
-  } catch(e) {
-    showToast('❌ Could not save: ' + e.message);
   }
 }
 
@@ -4824,28 +4734,6 @@ document.addEventListener('touchmove', function(e) {
     }
   }
 }, { passive: false });
-
-function obNextSkip2() {
-  const name = document.getElementById('ob-name').value.trim();
-  if (!name) { showToast('⚠️ Please enter your name'); return; }
-  selectedAI = 'claude'; // default
-  document.getElementById('ob-step-1').style.display = 'none';
-  document.getElementById('ob-step-3').style.display = 'block';
-  document.getElementById('step-dot-1').classList.remove('active');
-  document.getElementById('step-dot-1').classList.add('done');
-  document.getElementById('step-dot-3').classList.add('active');
-  document.getElementById('onboardingScreen').scrollTop = 0;
-}
-
-function obBackSkip2(step) {
-  document.getElementById(`ob-step-${step}`).style.display = 'none';
-  document.getElementById('ob-step-1').style.display = 'block';
-  document.getElementById(`step-dot-${step}`).classList.remove('active');
-  document.getElementById('step-dot-3').classList.remove('done');
-  document.getElementById('step-dot-1').classList.remove('done');
-  document.getElementById('step-dot-1').classList.add('active');
-  document.getElementById('onboardingScreen').scrollTop = 0;
-}
 
 function obNextSkip2() {
   const name = document.getElementById('ob-name').value.trim();

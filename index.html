@@ -1622,10 +1622,12 @@ window.addEventListener('load', async () => {
 // Handle auth state changes
 sbClient.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session) {
-    // Stash Google provider token for Calendar API calls. sessionStorage (not localStorage)
-    // because it clears on tab close — safer surface for a bearer token that expires in ~1hr.
+    // Persist Google's access token for calendar fetches. See the GOOGLE CALENDAR
+    // block for the { token, expires_at } format and the 5-min safety buffer.
+    // Supabase does not expose Google's own expires_in on the session object;
+    // Google access tokens default to 1 hour, which is what writeGcalToken uses.
     if (session.provider_token) {
-      sessionStorage.setItem('google_provider_token', session.provider_token);
+      writeGcalToken(session.provider_token);
     }
     // Replace history so swipe-back doesn't return to login screen,
     // but preserve the ?invite= param so partner linking still works
@@ -1635,7 +1637,8 @@ sbClient.auth.onAuthStateChange(async (event, session) => {
     window.history.replaceState(null, '', url.pathname + cleanSearch);
     await initApp(session.user);
   } else if (event === 'SIGNED_OUT') {
-    sessionStorage.removeItem('google_provider_token');
+    clearGcalToken();
+    clearCalendarCache();
     showAuthScreen();
   }
 });
@@ -1772,35 +1775,177 @@ async function refreshSession(refreshToken) {
   return sessionPayload;
 }
 
-// ─── GOOGLE CALENDAR (Phase 1) ───────────────────────────────
-// Dev-testable only for now — call from DevTools: fetchCalendarPrimary()
-// Digest integration ("This Week Together") lands in Phase 2.
-async function fetchCalendarPrimary() {
-  const token = sessionStorage.getItem('google_provider_token');
-  if (!token) {
-    console.warn('[Calendar] No Google provider token in session — user needs to sign out and back in to pick up the Calendar scope.');
-    return null;
-  }
-  const timeMin = new Date().toISOString();
-  const timeMax = new Date(Date.now() + 7 * 864e5).toISOString();
-  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=50`;
+// ─── GOOGLE CALENDAR ──────────────────────────────────────────
+// Plumbing for Loop C (Today timeline) and Loop D (Chief of Staff briefing).
+// No UI surface yet — call fetchCalendarPrimary() from DevTools to smoke-test.
+const GCAL_STORAGE_KEY = 'stwrd_gcal';
+const GCAL_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+const GCAL_DEFAULT_TTL_MS = 3600 * 1000; // Google access tokens default to ~1 hour
+const GCAL_CACHE_TTL_MS = 10 * 60 * 1000;
+
+// Module-scope cache for a single day's events. Cleared on sign-out or via
+// clearCalendarCache().
+let calendarCache = { date: null, events: null, fetchedAt: 0 };
+
+function clearCalendarCache() {
+  calendarCache = { date: null, events: null, fetchedAt: 0 };
+}
+
+function readStoredGcalToken() {
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.status === 401) {
-      console.warn('[Calendar] Token expired or revoked (401). MVP approach: user needs to re-auth. Proper refresh flow is Phase 2+.');
-      return null;
-    }
-    if (!res.ok) {
-      console.error('[Calendar] Fetch failed:', res.status, await res.text());
-      return null;
-    }
-    const data = await res.json();
-    console.log(`[Calendar] ${data.items?.length || 0} events in next 7 days:`, data.items);
-    return data.items || [];
+    const raw = localStorage.getItem(GCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.token || typeof parsed.expires_at !== 'number') return null;
+    // Treat as expired 5 min before Google's stated expiry so we don't hand
+    // out a token that dies mid-request.
+    if (parsed.expires_at <= Date.now() + GCAL_EXPIRY_BUFFER_MS) return null;
+    return parsed.token;
   } catch (e) {
-    console.error('[Calendar] Network error:', e);
     return null;
   }
+}
+
+function writeGcalToken(token, ttlMs = GCAL_DEFAULT_TTL_MS) {
+  if (!token) return;
+  const payload = { token, expires_at: Date.now() + ttlMs };
+  try {
+    localStorage.setItem(GCAL_STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('[Calendar] Failed to persist token:', e);
+  }
+}
+
+function clearGcalToken() {
+  localStorage.removeItem(GCAL_STORAGE_KEY);
+}
+
+// Initiate the Supabase OAuth redirect for calendar scope. With silent=true we
+// set prompt=none — if Google still has the user's session, the app comes back
+// with a fresh token without any consent UI. This is a full browser navigation;
+// execution past this call typically doesn't run before the page unloads.
+async function initiateGcalReauth({ silent = false } = {}) {
+  return sbClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin + window.location.pathname,
+      scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+      queryParams: {
+        prompt: silent ? 'none' : 'select_account',
+        access_type: 'offline',
+      },
+    },
+  });
+}
+
+// Single entry point for obtaining a valid Google Calendar access token.
+// Returns the token string on cache hit. On miss, initiates silent re-auth
+// (prompt=none redirect) and falls back to interactive if silent errors —
+// in both re-auth cases the function throws CALENDAR_AUTH_REDIRECTING because
+// the browser is navigating and no token is available in this tick.
+// On true failure (both silent and interactive initiation fail), throws
+// CALENDAR_AUTH_FAILED so callers can surface a "Connect your calendar" CTA.
+async function ensureCalendarToken() {
+  const cached = readStoredGcalToken();
+  if (cached) return cached;
+
+  let silentRes;
+  try {
+    silentRes = await initiateGcalReauth({ silent: true });
+  } catch (e) {
+    silentRes = { error: e };
+  }
+
+  if (silentRes?.error) {
+    try {
+      await initiateGcalReauth({ silent: false });
+    } catch (interactiveErr) {
+      const err = new Error('CALENDAR_AUTH_FAILED');
+      err.code = 'CALENDAR_AUTH_FAILED';
+      err.cause = interactiveErr;
+      throw err;
+    }
+  }
+
+  // Supabase navigates the browser on the calls above. If we reach here, the
+  // redirect is in-flight (or SDK was mocked / skipBrowserRedirect used).
+  const pending = new Error('CALENDAR_AUTH_REDIRECTING');
+  pending.code = 'CALENDAR_AUTH_REDIRECTING';
+  throw pending;
+}
+
+// Fetch events for a single calendar day in the user's local timezone.
+// Returns Event[] with { id, summary, start, end, location?, description? }.
+// Uses an in-memory 10-minute cache keyed by the date. On 401 mid-flight,
+// invalidates the token, re-ensures once, and retries. On network error,
+// retries once before giving up. Callers catch typed errors:
+//   CALENDAR_AUTH_REDIRECTING — browser is navigating for re-auth
+//   CALENDAR_AUTH_FAILED      — re-auth couldn't even initiate
+//   CALENDAR_NETWORK_ERROR    — network failure after retry
+//   CALENDAR_FETCH_FAILED_<N> — non-401 HTTP error from Google
+async function fetchCalendarPrimary(date = new Date()) {
+  const dateKey = date.toLocaleDateString('en-CA');
+  const now = Date.now();
+  if (calendarCache.date === dateKey
+      && calendarCache.events
+      && (now - calendarCache.fetchedAt) < GCAL_CACHE_TTL_MS) {
+    return calendarCache.events;
+  }
+
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const timeMin = dayStart.toISOString();
+  const timeMax = dayEnd.toISOString();
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events`
+    + `?timeMin=${encodeURIComponent(timeMin)}`
+    + `&timeMax=${encodeURIComponent(timeMax)}`
+    + `&singleEvents=true&orderBy=startTime&maxResults=50`;
+
+  const doFetch = (t) => fetch(url, { headers: { Authorization: `Bearer ${t}` } });
+
+  const token = await ensureCalendarToken();
+
+  let res;
+  try {
+    res = await doFetch(token);
+  } catch (networkErr) {
+    try {
+      res = await doFetch(token);
+    } catch (retryErr) {
+      const err = new Error('CALENDAR_NETWORK_ERROR');
+      err.code = 'CALENDAR_NETWORK_ERROR';
+      err.cause = retryErr;
+      throw err;
+    }
+  }
+
+  if (res.status === 401) {
+    clearGcalToken();
+    const freshToken = await ensureCalendarToken();
+    res = await doFetch(freshToken);
+  }
+
+  if (!res.ok) {
+    const err = new Error(`CALENDAR_FETCH_FAILED_${res.status}`);
+    err.code = `CALENDAR_FETCH_FAILED_${res.status}`;
+    err.status = res.status;
+    throw err;
+  }
+
+  const data = await res.json();
+  const events = (data.items || []).map(ev => ({
+    id: ev.id,
+    summary: ev.summary,
+    start: ev.start,
+    end: ev.end,
+    location: ev.location,
+    description: ev.description,
+  }));
+
+  calendarCache = { date: dateKey, events, fetchedAt: now };
+  return events;
 }
 
 async function signInWithGoogle() {
@@ -1841,6 +1986,8 @@ async function signOut() {
   localStorage.removeItem('stwrd-auth');
   localStorage.removeItem('stwrd-auth-code-verifier');
   localStorage.removeItem('apiKey');
+  clearGcalToken();
+  clearCalendarCache();
   // Fire SDK signOut but don't block on it
   try {
     await Promise.race([

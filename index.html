@@ -797,6 +797,39 @@
     margin-bottom: 20px;
     overflow: hidden;
   }
+  /* CALENDAR REAUTH BANNER (Loop E) — surfaces when a 401/403 from gcal flips
+     the calendarAuthExpired flag. Warm amber, not red — this is a "do this
+     thing" not "an error happened." Sits above today + brief content. */
+  .calendar-reauth-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, rgba(245,158,11,0.18) 0%, rgba(251,146,60,0.10) 100%);
+    border: 1px solid rgba(245,158,11,0.35);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .calendar-reauth-banner .banner-icon { font-size: 16px; line-height: 1; }
+  .calendar-reauth-banner .banner-text { flex: 1; }
+  .calendar-reauth-banner .banner-cta {
+    background: none;
+    border: none;
+    color: var(--p2);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+    margin-left: 4px;
+  }
+  .calendar-reauth-banner .banner-cta:hover { opacity: 0.85; }
   .briefing-card::before {
     content: '';
     position: absolute; top: 0; left: 0; right: 0;
@@ -1293,11 +1326,19 @@
 
   <!-- TODAY VIEW -->
   <div class="view" id="view-today">
+    <div class="calendar-reauth-banner" id="calendarReauthBannerToday" style="display:none;">
+      <span class="banner-icon">🔌</span>
+      <span class="banner-text">Google Calendar disconnected. <button class="banner-cta" onclick="reconnectGcal()">Reconnect</button></span>
+    </div>
     <div id="todayContent"></div>
   </div>
 
   <!-- BRIEF VIEW -->
   <div class="view active" id="view-brief">
+    <div class="calendar-reauth-banner" id="calendarReauthBannerBrief" style="display:none;">
+      <span class="banner-icon">🔌</span>
+      <span class="banner-text">Google Calendar disconnected. <button class="banner-cta" onclick="reconnectGcal()">Reconnect</button></span>
+    </div>
     <div class="brief-section-label">Chief of Staff · Today</div>
     <div id="briefingCard"></div>
     <div class="brief-section-label" style="margin-top:26px;">Chief of Staff · This Week</div>
@@ -1918,6 +1959,23 @@ function clearCalendarCache() {
   calendarCache = { date: null, events: null, fetchedAt: 0 };
 }
 
+// Loop E: typed error so callers can distinguish "Google said the token is
+// dead" (401/403) from generic network/server failures and surface a
+// reconnect prompt instead of silently degrading.
+class CalendarAuthExpiredError extends Error {
+  constructor(status) {
+    super(`CALENDAR_AUTH_EXPIRED_${status}`);
+    this.name = 'CalendarAuthExpiredError';
+    this.code = 'CALENDAR_AUTH_EXPIRED';
+    this.status = status;
+  }
+}
+
+// Flips true when any calendar fetch returns 401/403, false on the next
+// successful fetch. Drives the "Reconnect Google Calendar" banner on the
+// Today and Brief tabs.
+let calendarAuthExpired = false;
+
 function readStoredGcalToken() {
   try {
     const raw = localStorage.getItem(GCAL_STORAGE_KEY);
@@ -1945,6 +2003,33 @@ function writeGcalToken(token, ttlMs = GCAL_DEFAULT_TTL_MS) {
 
 function clearGcalToken() {
   localStorage.removeItem(GCAL_STORAGE_KEY);
+}
+
+// Loop E: User-triggered reconnect from the calendar-expired banner. Wipes
+// stored token + every cache so the post-OAuth render starts from a clean
+// slate. Uses the interactive prompt (no silent=true) because the user just
+// asked for it — surfacing a Google chooser is the expected behavior.
+async function reconnectGcal() {
+  clearGcalToken();
+  clearCalendarCache();
+  calendarRangeCache = { key: null, events: null, fetchedAt: 0 };
+  briefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
+  horizonBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
+  try {
+    await initiateGcalReauth({ silent: false });
+  } catch (e) {
+    showToast('❌ Reconnect failed: ' + (e?.message || e));
+  }
+}
+
+// Show or hide every reauth banner on the page (Today + Brief each have
+// their own DOM node). Called from the three render functions that read
+// calendar state.
+function updateCalendarReauthBanner() {
+  const display = calendarAuthExpired ? 'flex' : 'none';
+  document.querySelectorAll('.calendar-reauth-banner').forEach(el => {
+    el.style.display = display;
+  });
 }
 
 // Initiate the Supabase OAuth redirect for calendar scope. With silent=true we
@@ -2107,15 +2192,16 @@ async function fetchCalendarEvents(date = new Date()) {
 
   // Parallel fetch; each result is { ok, events }. `ok=false` entries are
   // logged and contribute zero events. Only if NONE succeed do we throw.
+  // Loop E: 401/403 means the token is dead at the API level — propagate
+  // CalendarAuthExpiredError so loadTodayCalendar can flip the banner flag
+  // instead of silently retrying into an OAuth redirect.
   const results = await Promise.all(calendars.map(async (cal) => {
     try {
-      let res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 401) {
-        clearGcalToken();
-        const freshToken = await ensureCalendarToken();
-        res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${freshToken}` } });
-      }
+      const res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          throw new CalendarAuthExpiredError(res.status);
+        }
         console.warn(`[Calendar] "${cal.summary}" returned ${res.status}, skipping`);
         return { ok: false, events: [] };
       }
@@ -2132,6 +2218,7 @@ async function fetchCalendarEvents(date = new Date()) {
       }));
       return { ok: true, events };
     } catch (e) {
+      if (e instanceof CalendarAuthExpiredError) throw e;
       console.warn(`[Calendar] "${cal.summary}" fetch threw:`, e?.message || e);
       return { ok: false, events: [] };
     }
@@ -2220,13 +2307,11 @@ async function fetchCalendarEventsRange(startDate, endDate) {
 
   const results = await Promise.all(calendars.map(async (cal) => {
     try {
-      let res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 401) {
-        clearGcalToken();
-        const freshToken = await ensureCalendarToken();
-        res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${freshToken}` } });
-      }
+      const res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          throw new CalendarAuthExpiredError(res.status);
+        }
         console.warn(`[Calendar] range "${cal.summary}" returned ${res.status}, skipping`);
         return { ok: false, events: [] };
       }
@@ -2250,6 +2335,7 @@ async function fetchCalendarEventsRange(startDate, endDate) {
       });
       return { ok: true, events };
     } catch (e) {
+      if (e instanceof CalendarAuthExpiredError) throw e;
       console.warn(`[Calendar] range "${cal.summary}" fetch threw:`, e?.message || e);
       return { ok: false, events: [] };
     }
@@ -3744,7 +3830,7 @@ function relativeDateLabel(targetDateStr, todayDateStr) {
 // earlier loops regenerate under the new context shape + prompt hardening.
 // Bump when the briefing schema or prompt changes in a way that makes old
 // cached text misleading.
-const BRIEFING_VERSION = 'd3';
+const BRIEFING_VERSION = 'e';
 
 // Gather the signals Claude needs. windowType accepts 'today' (Loop D) and
 // 'horizon' (Loop D-2). Both branches emit {date, day_name, relative_label}
@@ -3918,6 +4004,7 @@ Do NOT:
 - Be performative, cheerleadery, or use phrases like "you've got this" or "let's make today great"
 - Summarize everything — pick the 2-3 most important signals
 - Exceed 60 words
+- If today_events is empty, do NOT mention the calendar or any meetings. Focus entirely on tasks. Do not say "your calendar is empty" or "no meetings today" — just write the briefing as if there are no scheduled events to discuss.
 
 Write in prose. Write like a trusted advisor who actually knows this person's life.
 
@@ -3987,6 +4074,7 @@ async function renderBriefing() {
   // Warm the calendar cache. Cheap hit if Today was already visited; at most
   // one fetch the first time Dashboard opens in a session.
   try { await loadTodayCalendar(); } catch (e) { /* briefing still works with empty events */ }
+  updateCalendarReauthBanner();
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
@@ -4058,6 +4146,7 @@ Do NOT:
 - Be performative, cheerleadery, or reassuring
 - Just summarize the calendar — interpret it
 - Exceed 60 words
+- If horizon_events is empty, do NOT mention the calendar or any meetings. Focus entirely on tasks. Do not say "your calendar is empty" or "no meetings today" — just write the briefing as if there are no scheduled events to discuss.
 
 Write in prose. Write like a trusted advisor looking at the week ahead with the user.
 
@@ -4080,7 +4169,13 @@ async function loadHorizonCalendar() {
     const end = new Date();
     end.setDate(end.getDate() + 6);
     horizonCalendarEvents = await fetchCalendarEventsRange(start, end);
+    calendarAuthExpired = false;
   } catch (e) {
+    if (e instanceof CalendarAuthExpiredError) {
+      calendarAuthExpired = true;
+      horizonCalendarEvents = [];
+      return;
+    }
     console.warn('[Horizon] calendar fetch failed:', e?.code || e?.message);
     horizonCalendarEvents = [];
   }
@@ -4144,6 +4239,7 @@ async function renderHorizonBriefing() {
   // Load 7-day event window. Own cache (calendarRangeCache, 30 min) so this
   // doesn't thrash Loop C's single-day calendarCache.
   try { await loadHorizonCalendar(); } catch (e) { /* briefing still works with [] */ }
+  updateCalendarReauthBanner();
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
@@ -4627,7 +4723,15 @@ async function loadTodayCalendar({ force = false } = {}) {
     const events = await fetchCalendarPrimary();
     todayCalendarEvents = Array.isArray(events) ? events : [];
     todayCalendarError = null;
+    calendarAuthExpired = false;
   } catch (err) {
+    if (err instanceof CalendarAuthExpiredError) {
+      // Banner takes over — don't double-report via inline error notice.
+      calendarAuthExpired = true;
+      todayCalendarEvents = [];
+      todayCalendarError = null;
+      return;
+    }
     todayCalendarEvents = [];
     todayCalendarError = err?.code || 'CALENDAR_UNKNOWN_ERROR';
   }
@@ -4650,6 +4754,7 @@ async function renderToday() {
 
   // Pull calendar (cached 10 min per Loop B). Safe to call on every render.
   await loadTodayCalendar();
+  updateCalendarReauthBanner();
 
   const now = new Date();
   const nowMs = now.getTime();

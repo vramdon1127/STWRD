@@ -3818,7 +3818,7 @@ function relativeDateLabel(targetDateStr, todayDateStr) {
 // earlier loops regenerate under the new context shape + prompt hardening.
 // Bump when the briefing schema or prompt changes in a way that makes old
 // cached text misleading.
-const BRIEFING_VERSION = 'g';
+const BRIEFING_VERSION = 'h';
 
 // Gather the signals Claude needs. windowType accepts 'today' (Loop D),
 // 'tomorrow' (Loop G), and 'horizon' (Loop D-2). All branches emit
@@ -4073,6 +4073,8 @@ Write a 2-3 sentence briefing about their day. Be warm but observational — not
 
 If shared-calendar events involving family members or a partner are present in the context, reference them by name when relevant — these are part of the household's life, not separate.
 
+All-day events on a personal or business calendar are often significant commitments — DJ gigs, weddings, paid bookings, medical appointments, travel days, conferences, deadlines that anchor the day. Surface them by name when present. Do not treat a day with an all-day event as "open" or "light" just because the timed-events array is short — the all-day commitment may BE the day.
+
 Do NOT:
 - When referring to a day or date, use EXACTLY the date, day_name, and relative_label values from the context. Do NOT compute day-of-week yourself. Do NOT invent new date/day pairings. If an event's day_name is "Tuesday" and its date is "2026-04-28", refer to it as "Tuesday 4/28" or "Tuesday the 28th" or "next Tuesday" — never as any other day name.
 - Use bullet points or lists
@@ -4080,6 +4082,7 @@ Do NOT:
 - Summarize everything — pick the 2-3 most important signals
 - Exceed 60 words
 - If today_events is empty, do NOT mention the calendar or any meetings. Focus entirely on tasks. Do not say "your calendar is empty" or "no meetings today" — just write the briefing as if there are no scheduled events to discuss.
+- Describe a day as "open," "light," or "clear" when an all-day event is present in the events array. The all-day event is part of the day's weight even if it has no specific time.
 - Refer to yourself as a "chief of staff" or use any executive/corporate framing. Do not use "principal" or similar advisor-to-executive language.
 
 Write in prose. Write like a trusted friend who actually knows this person's life.
@@ -4218,6 +4221,8 @@ Write a 2-3 sentence briefing about TOMORROW. The cognitive job is preparation: 
 
 Be warm but observational. Notice the SHAPE of tomorrow — heavy morning, clear afternoon, single anchor event, etc. Pick the 2-3 most important signals.
 
+All-day events on a personal or business calendar are often significant commitments — DJ gigs, weddings, paid bookings, medical appointments, travel days, conferences, deadlines that anchor the day. Surface them by name when present. Do not treat a day with an all-day event as "open" or "light" just because the timed-events array is short — the all-day commitment may BE the day.
+
 Use EXACTLY the date, day_name, and relative_label values from the context. Do NOT compute day-of-week yourself.
 
 Do NOT:
@@ -4227,6 +4232,7 @@ Do NOT:
 - Use "principal" or similar advisor-to-executive language
 - Exceed 60 words
 - Mention an empty calendar if tomorrow_events is empty — just focus on tasks
+- Describe a day as "open," "light," or "clear" when an all-day event is present in the events array. The all-day event is part of the day's weight even if it has no specific time.
 
 Write in prose. Write like a friend who knows your life and is helping you think about tomorrow.`;
 

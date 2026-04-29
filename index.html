@@ -3523,10 +3523,20 @@ async function submitNewProject() {
   const btn = document.getElementById('newProjectSubmitBtn');
   btn.disabled = true;
   btn.textContent = 'Creating…';
+  let aiIcon;
+  if (!iconInput) {
+    try {
+      const personality = await Promise.race([
+        assignHatPersonality(name),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
+      ]);
+      aiIcon = personality?.icon;
+    } catch(e) { /* timeout — silently fall back */ }
+  }
   const payload = {
     user_id: currentUserId,
     name,
-    icon: iconInput || DEFAULT_HAT_ICON,
+    icon: iconInput || aiIcon || DEFAULT_HAT_ICON,
     color: '#7c6fef',
     sort_order: userHats.length,
   };

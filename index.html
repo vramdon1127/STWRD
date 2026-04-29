@@ -5522,32 +5522,34 @@ async function assignHatPersonality(name) {
     }
   }
 
-  // Try API if available
-  if (apiKey) {
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 60,
-          messages: [{ role: 'user', content: `For a life management app, assign an emoji and color for a project called "${name}".
+  // Try the serverless endpoint. apiKey may be null in prod (non-BYOK users);
+  // /api/process falls back to process.env.ANTHROPIC_API_KEY on the Claude path.
+  try {
+    const response = await fetch('/api/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey,
+        prompt: `For a life management app, assign an emoji and color for a project called "${name}".
 Rules:
 - Emoji must match the role's real-world vibe
 - Color must be a hex code — NEVER use red, amber/yellow, or green ranges (reserved for status)
 - Good colors: purples, blues, cyans, pinks, teals, indigos
 Respond ONLY:
 EMOJI: [single emoji]
-COLOR: [hex code]` }]
-        })
-      });
+COLOR: [hex code]`,
+        maxTokens: 60,
+        provider: (currentUserProfile?.preferred_ai || selectedAI || 'claude'),
+      })
+    });
+    if (response.ok) {
       const data = await response.json();
       const text = data.content?.[0]?.text || '';
       const emoji = text.match(/EMOJI:\s*(.+)/)?.[1]?.trim();
       const color = text.match(/COLOR:\s*(#[0-9a-fA-F]{6})/)?.[1]?.trim();
       if (emoji && color) return { icon: emoji, color };
-    } catch(e) {}
-  }
+    }
+  } catch(e) {}
 
   // Final fallback
   return { icon: '📋', color: '#a78bfa' };

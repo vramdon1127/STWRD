@@ -1864,9 +1864,9 @@ async function initApp(user) {
   if (inviteToken) acceptInvite(inviteToken);
   setupRealtime();
   maybeShowAiExplainer();
-  // Brief is the default landing tab (HTML has view-brief as .active). Kick
-  // the renderer so the two briefing cards actually paint on first load.
-  showView('brief');
+  // Restore last-visited view from localStorage; falls back to 'brief' for
+  // first login, blocked storage, or stale/invalid values.
+  showView(getPersistedView());
   
   // Load settings
 
@@ -4784,6 +4784,17 @@ async function renderStats() {
   `;
 }
 // ─── UI HELPERS ───────────────────────────────────────────────
+const STWRD_LAST_VIEW_KEY = 'stwrd_lastView';
+const VALID_VIEWS = ['capture', 'today', 'brief', 'stats', 'settings'];
+
+function getPersistedView() {
+  try {
+    const stored = localStorage.getItem(STWRD_LAST_VIEW_KEY);
+    if (stored && VALID_VIEWS.includes(stored)) return stored;
+  } catch(e) { /* localStorage unavailable — fall through to default */ }
+  return 'brief';
+}
+
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -4798,6 +4809,9 @@ function showView(name) {
   } else {
     stopTodayAutoRefresh();
   }
+  try {
+    if (VALID_VIEWS.includes(name)) localStorage.setItem(STWRD_LAST_VIEW_KEY, name);
+  } catch(e) { /* localStorage unavailable — silent no-op, view switch already succeeded */ }
 }
 
 function setFilter(filter, btn) {

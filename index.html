@@ -6774,7 +6774,14 @@ async function switchView(mode) {
   tomorrowBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   horizonBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
 
-  if (mode === 'partner' && partnerData) {
+  if (mode === 'partner') {
+    if (!partnerData) {
+      await loadPartner();
+    }
+    if (!partnerData) {
+      showToast('No partner linked');
+      return;
+    }
     viewingPartner = true;
     myTasks = [...tasks];
     myHats = [...userHats];

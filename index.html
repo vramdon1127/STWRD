@@ -4344,7 +4344,7 @@ async function renderBriefing() {
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const fingerprint = `${today}|${BRIEFING_VERSION}|${briefingTaskFingerprint()}`;
+  const fingerprint = `${today}|${BRIEFING_VERSION}|${viewingPartner ? partnerData.id : currentUserId}|${briefingTaskFingerprint()}`;
   const cacheHit = briefingCache.fingerprint === fingerprint
     && briefingCache.text
     && (now - briefingCache.ts) < BRIEFING_CACHE_TTL_MS;
@@ -4485,7 +4485,7 @@ async function renderTomorrowBriefing() {
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const fingerprint = `${today}|${BRIEFING_VERSION}|${tomorrowTaskFingerprint()}`;
+  const fingerprint = `${today}|${BRIEFING_VERSION}|${viewingPartner ? partnerData.id : currentUserId}|${tomorrowTaskFingerprint()}`;
   const cacheHit = tomorrowBriefingCache.fingerprint === fingerprint
     && tomorrowBriefingCache.text
     && (now - tomorrowBriefingCache.ts) < TOMORROW_BRIEFING_CACHE_TTL_MS;
@@ -4653,7 +4653,7 @@ async function renderHorizonBriefing() {
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const fingerprint = `${today}|${BRIEFING_VERSION}|${horizonTaskFingerprint()}`;
+  const fingerprint = `${today}|${BRIEFING_VERSION}|${viewingPartner ? partnerData.id : currentUserId}|${horizonTaskFingerprint()}`;
   const cacheHit = horizonBriefingCache.fingerprint === fingerprint
     && horizonBriefingCache.text
     && (now - horizonBriefingCache.ts) < HORIZON_BRIEFING_CACHE_TTL_MS;

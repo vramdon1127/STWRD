@@ -1148,12 +1148,22 @@
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;text-align:center;">
       <div style="font-size:32px;margin-bottom:8px;">🔗</div>
       <div style="font-size:14px;font-weight:600;margin-bottom:4px;">No partner linked yet</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.5;">Generate an invite link and share it. When your partner opens it and signs in, you'll both be connected.</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.5;">Send your partner an invite. When they sign in, you'll both be connected.</div>
     </div>
-    <button onclick="generateInvite()" id="inviteBtn" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-      Generate Invite Link
-    </button>
+
+    <!-- Email send path (primary) -->
+    <input id="partnerEmailInput" type="email" placeholder="Partner's email" autocomplete="email" oninput="updateSendInviteBtnState()" onkeydown="if(event.key==='Enter' && !document.getElementById('sendInviteBtn').disabled) sendInviteEmail()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;margin-bottom:10px;box-sizing:border-box;">
+    <button id="sendInviteBtn" onclick="sendInviteEmail()" disabled style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--surface2);color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:not-allowed;opacity:0.5;transition:all 0.2s;">Send invite</button>
+
+    <!-- Divider -->
+    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 10px;">
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <div style="font-size:11px;color:var(--text2);">or copy a link instead</div>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+
+    <!-- Copy-link path (fallback, demoted) -->
+    <button onclick="generateInvite()" id="inviteBtn" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">Generate invite link</button>
     <div id="inviteResult" style="margin-top:12px;"></div>
   </div>
 
@@ -1647,6 +1657,7 @@ let partnerData = null;       // { id, name, profile }
 let viewingPartner = false;   // true = showing partner's view
 let myTasks = [];             // backup of own tasks when switching views
 let myHats = [];              // backup of own hats
+let pendingInviteToken = null; // reused by both copy-link and email-send paths within a session
 
 // ─── INIT ─────────────────────────────────────────────────────
 let knowledgeBase = {};
@@ -6752,38 +6763,119 @@ async function switchView(mode) {
   }
 }
 
+// Token + DB-row creation. Used by both the copy-link and email-send paths.
+// Stores the token in module state so a follow-up send within the same
+// session reuses the same partnerships row instead of creating a new one.
+async function createPartnershipToken() {
+  // crypto.randomUUID() not available in all mobile browsers — use fallback
+  const token = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+  await sbFetch('partnerships', 'POST', {
+    inviter_id: currentUserId,
+    invite_token: token,
+    status: 'pending'
+  });
+  pendingInviteToken = token;
+  return token;
+}
+
 async function generateInvite() {
   const btn = document.getElementById('inviteBtn');
   const result = document.getElementById('inviteResult');
   btn.disabled = true;
   btn.textContent = 'Generating...';
   try {
-    // crypto.randomUUID() not available in all mobile browsers — use fallback
-    const token = typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-          const r = Math.random() * 16 | 0;
-          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        });
-    await sbFetch('partnerships', 'POST', {
-      inviter_id: currentUserId,
-      invite_token: token,
-      status: 'pending'
-    });
+    const token = pendingInviteToken || await createPartnershipToken();
     const link = `${window.location.origin}${window.location.pathname}?invite=${token}`;
     result.innerHTML = `
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;">
         <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Share this link with your partner:</div>
         <div style="font-size:12px;color:var(--text);word-break:break-all;background:var(--bg);padding:10px;border-radius:8px;margin-bottom:10px;">${link}</div>
         <button onclick="copyInviteLink('${link}')" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--accent);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:8px;">📋 Copy Link</button>
-        <button onclick="document.getElementById('inviteResult').innerHTML='';document.getElementById('inviteBtn').style.display='flex';" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;">Generate a new link</button>
       </div>`;
     btn.style.display = 'none';
   } catch(e) {
     result.innerHTML = `<div style="color:var(--accent2);font-size:13px;margin-top:8px;">Failed to generate. Try again.</div>`;
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Generate Invite Link';
+    btn.textContent = 'Generate invite link';
+  }
+}
+
+function updateSendInviteBtnState() {
+  const input = document.getElementById('partnerEmailInput');
+  const btn = document.getElementById('sendInviteBtn');
+  if (!input || !btn) return;
+  const hasValue = input.value.trim().length > 0;
+  btn.disabled = !hasValue;
+  if (hasValue) {
+    btn.style.background = 'linear-gradient(135deg,var(--accent),#8b5cf6)';
+    btn.style.color = 'white';
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.style.background = 'var(--surface2)';
+    btn.style.color = 'var(--text2)';
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+  }
+}
+
+async function sendInviteEmail() {
+  const input = document.getElementById('partnerEmailInput');
+  const btn = document.getElementById('sendInviteBtn');
+  const email = input.value.trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('⚠️ Enter a valid email');
+    return;
+  }
+  // Read auth email from cached session for self-invite check (UX only).
+  let inviterEmail = '';
+  try {
+    const sess = JSON.parse(localStorage.getItem('stwrd-auth') || '{}');
+    inviterEmail = (sess?.user?.email || '').toLowerCase();
+  } catch(e) { /* ignore */ }
+  if (inviterEmail && email === inviterEmail) {
+    showToast('⚠️ You can\'t invite yourself');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const token = pendingInviteToken || await createPartnershipToken();
+    const inviterName = currentUserProfile?.full_name?.split(' ')[0] || 'Your partner';
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        partnerEmail: email,
+        inviteToken: token,
+        inviterName,
+        inviterEmail,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Send failed');
+    // Brief success state — prevents accidental double-send.
+    btn.textContent = 'Invite sent ✓';
+    btn.style.background = 'var(--done)';
+    btn.style.color = '#0a0a0f';
+    showToast(`📧 Invite sent to ${email}`);
+    setTimeout(() => {
+      input.value = '';
+      btn.textContent = 'Send invite';
+      updateSendInviteBtnState();
+    }, 3000);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Send invite';
+    updateSendInviteBtnState();
+    showToast('❌ Could not send invite: ' + (e.message || 'unknown'));
+    console.error('sendInviteEmail failed:', e);
   }
 }
 

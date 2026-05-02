@@ -1724,6 +1724,27 @@ window.addEventListener('load', async () => {
               console.warn('[STWRD] no provider_token on pkce-exchange — calendar features will prompt for re-auth');
             }
 
+            // C1 Phase 1: persist Google's refresh token to profiles when present.
+            const refreshToken = tokenData.provider_refresh_token;
+            const userId = tokenData.user?.id;
+            if (refreshToken && userId) {
+              try {
+                const { error: rtError } = await sbClient
+                  .from('profiles')
+                  .update({
+                    gcal_refresh_token: refreshToken,
+                    gcal_token_updated_at: new Date().toISOString()
+                  })
+                  .eq('id', userId);
+                if (rtError) {
+                  console.error('[STWRD] Failed to persist gcal refresh token:', rtError);
+                } else {
+                  console.log('[STWRD] gcal refresh token persisted for user:', userId);
+                }
+              } catch (err) {
+                console.error('[STWRD] Exception persisting gcal refresh token:', err);
+              }
+            }
             // Manually persist the session in the shape Supabase expects
             const sessionPayload = {
               access_token: tokenData.access_token,

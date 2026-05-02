@@ -1712,6 +1712,7 @@ window.addEventListener('load', async () => {
             console.error('[STWRD] Token exchange failed:', tokenRes.status, errText);
           } else {
             const tokenData = await tokenRes.json();
+            console.log('[STWRD-DIAG] tokenData keys:', Object.keys(tokenData));
             console.log('[STWRD] Token exchange succeeded, user:', tokenData.user?.id);
 
             // Capture Google's access token from the PKCE response body. This is
@@ -2089,7 +2090,7 @@ async function initiateGcalReauth({ silent = false } = {}) {
       redirectTo: window.location.origin + window.location.pathname,
       scopes: 'https://www.googleapis.com/auth/calendar.readonly',
       queryParams: {
-        prompt: silent ? 'none' : 'select_account',
+        prompt: silent ? 'none' : 'consent',
         access_type: 'offline',
       },
     },
@@ -2460,7 +2461,7 @@ async function signInWithGoogle() {
         redirectTo: window.location.origin + window.location.pathname,
         scopes: 'https://www.googleapis.com/auth/calendar.readonly',
         queryParams: {
-          prompt: 'select_account',
+          prompt: 'consent',
           access_type: 'offline',
         },
       }

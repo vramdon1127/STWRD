@@ -1136,6 +1136,17 @@
   </div>
 </header>
 
+<!-- Partner-view sticky banner — visible only when viewingPartner === true.
+     Sits below the (also-sticky) header so the mode signal stays visible
+     while scrolling. Toggled in JS by applyPartnerBanner(). -->
+<div id="partnerViewBanner" role="status" aria-live="polite" style="display:none;position:sticky;top:60px;z-index:99;background:rgba(244,114,182,0.15);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(244,114,182,0.3);padding:10px 16px;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+  <div style="color:var(--accent2);font-weight:600;display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;">
+    <span aria-hidden="true">👀</span>
+    <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">You're viewing <span id="partnerBannerName">your partner</span>'s world</span>
+  </div>
+  <button onclick="switchView('self')" style="background:transparent;border:1px solid var(--accent2);color:var(--accent2);border-radius:8px;padding:6px 12px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;flex:0 0 auto;white-space:nowrap;transition:all 0.2s;" onmouseover="this.style.background='rgba(244,114,182,0.15)'" onmouseout="this.style.background='transparent'">🏠 Back to your world</button>
+</div>
+
 <!-- PARTNER PANEL -->
 <div id="partnerPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);border-radius:24px 24px 0 0;z-index:300;padding:20px 20px 40px;box-shadow:0 -8px 40px rgba(0,0,0,0.5);animation:slideUp 0.3s ease;max-width:600px;margin:0 auto;">
   <!-- Handle -->
@@ -1180,7 +1191,7 @@
 
     <!-- View toggle -->
     <div style="display:flex;gap:10px;margin-bottom:16px;">
-      <button id="panelMyBtn" onclick="switchView('mine')" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--accent);background:rgba(124,111,239,0.15);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.2s;">🏠 My World</button>
+      <button id="panelMyBtn" onclick="switchView('mine')" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--accent);background:rgba(124,111,239,0.15);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.2s;">My world</button>
       <button id="panelPartnerBtn" onclick="switchView('partner')" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:all 0.2s;"></button>
     </div>
 
@@ -1878,7 +1889,10 @@ async function initApp(user) {
   // Restore last-visited view from localStorage; falls back to 'brief' for
   // first login, blocked storage, or stale/invalid values.
   showView(getPersistedView());
-  
+  // Initial banner state — viewingPartner defaults to false on every load,
+  // so this hides the banner on first paint regardless of DOM defaults.
+  applyPartnerBanner();
+
   // Load settings
 
 }
@@ -3515,6 +3529,22 @@ function applyPartnerViewVisibility() {
   if (explainer) {
     const dismissed = !!localStorage.getItem('aiExplainerDismissed');
     explainer.style.display = (showCapture && !dismissed) ? 'block' : 'none';
+  }
+}
+
+// Sticky partner-view banner. Appears only when viewingPartner === true.
+// Carries the mode signal globally — visible across all bottom-nav screens
+// even when the partner panel is closed. Pairs with the in-panel viewIndicator
+// (which stays as belt-and-suspenders for in-panel context).
+function applyPartnerBanner() {
+  const banner = document.getElementById('partnerViewBanner');
+  if (!banner) return;
+  const nameEl = document.getElementById('partnerBannerName');
+  if (viewingPartner && partnerData?.name) {
+    if (nameEl) nameEl.textContent = partnerData.name;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
   }
 }
 
@@ -6731,7 +6761,7 @@ function renderPartnerPanel(partner) {
     const nameEl = document.getElementById('partnerCardName');
     const partnerBtn = document.getElementById('panelPartnerBtn');
     if (nameEl) nameEl.textContent = partner.name;
-    if (partnerBtn) partnerBtn.textContent = `👀 ${partner.name}'s World`;
+    if (partnerBtn) partnerBtn.textContent = `${partner.name}'s world`;
   } else {
     if (empty) empty.style.display = 'block';
     if (linked) linked.style.display = 'none';
@@ -6796,6 +6826,7 @@ async function switchView(mode) {
     if (partnerBtn) { partnerBtn.style.borderColor = 'var(--accent2)'; partnerBtn.style.background = 'rgba(244,114,182,0.15)'; partnerBtn.style.color = 'var(--accent2)'; }
     if (indicator) indicator.textContent = `Viewing ${partnerData.name}'s tasks and life score`;
     applyPartnerViewVisibility();
+    applyPartnerBanner();
     renderTasks();
     togglePartnerPanel();
     showToast(`👀 Viewing ${partnerData.name}'s world`);
@@ -6807,6 +6838,7 @@ async function switchView(mode) {
     if (partnerBtn) { partnerBtn.style.borderColor = 'var(--border)'; partnerBtn.style.background = 'transparent'; partnerBtn.style.color = 'var(--text2)'; }
     if (indicator) indicator.textContent = 'Viewing your own tasks and life score';
     applyPartnerViewVisibility();
+    applyPartnerBanner();
     renderTasks();
     togglePartnerPanel();
     showToast('🏠 Back to your world');

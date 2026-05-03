@@ -2153,6 +2153,63 @@ async function ensureCalendarToken() {
   throw pending;
 }
 
+// Phase 2b — fetch calendar token for self OR partner
+// Self path delegates to ensureCalendarToken (existing localStorage flow).
+// Partner path calls /api/refresh-gcal-token with caller's JWT.
+const _partnerTokenCache = new Map(); // userId -> { access_token, expires_at_ms }
+
+async function getCalendarTokenForUser(userId) {
+  // Self path: existing flow, unchanged
+  if (userId === currentUserId) {
+    return ensureCalendarToken();
+  }
+
+  // Partner path — in-memory cache check
+  const cached = _partnerTokenCache.get(userId);
+  if (cached && cached.expires_at_ms > Date.now() + 60000) {
+    return cached.access_token;
+  }
+
+  // Direct localStorage JWT read (mirrors line 1798 pattern, avoids Safari getSession hang)
+  let jwt = null;
+  try {
+    const raw = localStorage.getItem('stwrd-auth');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      jwt = parsed?.access_token || parsed?.currentSession?.access_token || null;
+    }
+  } catch (e) {
+    console.error('[gcal] failed to read stwrd-auth', e);
+  }
+  if (!jwt) throw new Error('NO_SESSION');
+
+  const res = await fetch('/api/refresh-gcal-token', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${jwt}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ userId })
+  });
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      // Partner hasn't completed gcal onboarding — treat as no calendar
+      return null;
+    }
+    const err = await res.json().catch(() => ({}));
+    console.error('[gcal] partner token fetch failed', res.status, err);
+    throw new Error(`PARTNER_TOKEN_FAILED_${res.status}`);
+  }
+
+  const { access_token, expires_in } = await res.json();
+  _partnerTokenCache.set(userId, {
+    access_token,
+    expires_at_ms: Date.now() + (expires_in - 120) * 1000
+  });
+  return access_token;
+}
+
 // List the user's subscribed calendars. Cached 1 hour because subscriptions
 // rarely change. Returns [{ id, summary, primary, selected, accessRole }].
 // Used to query events across every calendar the user has turned on in
@@ -2160,12 +2217,13 @@ async function ensureCalendarToken() {
 const GCAL_LIST_TTL_MS = 60 * 60 * 1000;
 let calendarListCache = { list: null, fetchedAt: 0 };
 
-async function listUserCalendars() {
+async function listUserCalendars(userId = currentUserId) {
   const now = Date.now();
   if (calendarListCache.list && (now - calendarListCache.fetchedAt) < GCAL_LIST_TTL_MS) {
     return calendarListCache.list;
   }
-  const token = await ensureCalendarToken();
+  const token = await getCalendarTokenForUser(userId);
+  if (!token) return [];
   const url = 'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250';
   const doFetch = (t) => fetch(url, { headers: { Authorization: `Bearer ${t}` } });
 
@@ -2179,8 +2237,10 @@ async function listUserCalendars() {
     throw err;
   }
   if (res.status === 401) {
-    clearGcalToken();
-    const freshToken = await ensureCalendarToken();
+    if (userId === currentUserId) clearGcalToken();
+    else _partnerTokenCache.delete(userId);
+    const freshToken = await getCalendarTokenForUser(userId);
+    if (!freshToken) return [];
     res = await doFetch(freshToken);
   }
   if (!res.ok) {
@@ -2219,7 +2279,7 @@ function isHolidayCalendar(cal) {
 //   CALENDAR_AUTH_REDIRECTING — browser is navigating for re-auth
 //   CALENDAR_AUTH_FAILED      — re-auth couldn't even initiate
 //   CALENDAR_NETWORK_ERROR    — EVERY calendar fetch failed (rare; total outage)
-async function fetchCalendarEvents(date = new Date()) {
+async function fetchCalendarEvents(date = new Date(), userId = currentUserId) {
   const dateKey = date.toLocaleDateString('en-CA');
   const now = Date.now();
   if (calendarCache.date === dateKey
@@ -2239,7 +2299,7 @@ async function fetchCalendarEvents(date = new Date()) {
   // fall back to /primary so at least the user's own events show.
   let calendars;
   try {
-    const all = await listUserCalendars();
+    const all = await listUserCalendars(userId);
     calendars = all.filter(c => c.selected && !isHolidayCalendar(c));
     if (calendars.length === 0) {
       calendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
@@ -2249,7 +2309,8 @@ async function fetchCalendarEvents(date = new Date()) {
     calendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
   }
 
-  const token = await ensureCalendarToken();
+  const token = await getCalendarTokenForUser(userId);
+  if (!token) return [];
 
   const buildUrl = (calId) =>
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
@@ -2320,8 +2381,8 @@ async function fetchCalendarEvents(date = new Date()) {
 }
 
 // Backwards-compat alias; prefer fetchCalendarEvents in new code.
-async function fetchCalendarPrimary(date = new Date()) {
-  return fetchCalendarEvents(date);
+async function fetchCalendarPrimary(date = new Date(), userId = currentUserId) {
+  return fetchCalendarEvents(date, userId);
 }
 
 // Fetch events across every selected, non-holiday calendar for an arbitrary
@@ -2335,8 +2396,8 @@ async function fetchCalendarPrimary(date = new Date()) {
 const GCAL_RANGE_CACHE_TTL_MS = 30 * 60 * 1000;
 let calendarRangeCache = { key: null, events: null, fetchedAt: 0 };
 
-async function fetchCalendarEventsRange(startDate, endDate) {
-  if (!readStoredGcalToken()) return [];
+async function fetchCalendarEventsRange(startDate, endDate, userId = currentUserId) {
+  if (userId === currentUserId && !readStoredGcalToken()) return [];
 
   const startMs = new Date(startDate);
   startMs.setHours(0, 0, 0, 0);
@@ -2354,7 +2415,7 @@ async function fetchCalendarEventsRange(startDate, endDate) {
 
   let calendars;
   try {
-    const all = await listUserCalendars();
+    const all = await listUserCalendars(userId);
     calendars = all.filter(c => c.selected && !isHolidayCalendar(c));
     if (calendars.length === 0) {
       calendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
@@ -2364,7 +2425,8 @@ async function fetchCalendarEventsRange(startDate, endDate) {
     calendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
   }
 
-  const token = await ensureCalendarToken();
+  const token = await getCalendarTokenForUser(userId);
+  if (!token) return [];
 
   const buildUrl = (calId) =>
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
@@ -4401,7 +4463,7 @@ async function renderBriefing() {
 
   // Warm the calendar cache. Cheap hit if Today was already visited; at most
   // one fetch the first time Dashboard opens in a session.
-  try { await loadTodayCalendar(); } catch (e) { /* briefing still works with empty events */ }
+  try { await loadTodayCalendar({ userId: viewingPartner ? partnerData?.id : currentUserId }); } catch (e) { /* briefing still works with empty events */ }
   updateCalendarReauthBanner();
 
   const now = Date.now();
@@ -4542,7 +4604,7 @@ async function renderTomorrowBriefing() {
 
   // Tomorrow piggybacks on the 7-day horizon fetch — this is a no-op when
   // renderHorizonBriefing already warmed it on the same render pass.
-  try { await loadHorizonCalendar(); } catch (e) { /* still works with [] */ }
+  try { await loadHorizonCalendar(viewingPartner ? partnerData?.id : currentUserId); } catch (e) { /* still works with [] */ }
   updateCalendarReauthBanner();
 
   const now = Date.now();
@@ -4630,9 +4692,11 @@ Example outputs to calibrate tone:
 
 "The week ahead is front-loaded: three Caliber meetings Monday through Wednesday, then it clears. Mia's birthday prep is on the 28th, and the Lennon wedding on May 3 needs a Vibo event before Friday. Worth blocking time Wednesday afternoon for wedding ops before the calendar tightens again."`;
 
-async function loadHorizonCalendar() {
+async function loadHorizonCalendar(userId = currentUserId) {
   // Short-circuit if no token — briefing still runs with empty events.
-  if (!readStoredGcalToken()) {
+  // Self path uses the localStorage gate; partner path skips and relies on the
+  // server resolver to surface "no calendar" via empty events.
+  if (userId === currentUserId && !readStoredGcalToken()) {
     horizonCalendarEvents = [];
     return;
   }
@@ -4640,7 +4704,7 @@ async function loadHorizonCalendar() {
     const start = new Date();
     const end = new Date();
     end.setDate(end.getDate() + 6);
-    horizonCalendarEvents = await fetchCalendarEventsRange(start, end);
+    horizonCalendarEvents = await fetchCalendarEventsRange(start, end, userId);
     calendarAuthExpired = false;
   } catch (e) {
     if (e instanceof CalendarAuthExpiredError) {
@@ -4710,7 +4774,7 @@ async function renderHorizonBriefing() {
 
   // Load 7-day event window. Own cache (calendarRangeCache, 30 min) so this
   // doesn't thrash Loop C's single-day calendarCache.
-  try { await loadHorizonCalendar(); } catch (e) { /* briefing still works with [] */ }
+  try { await loadHorizonCalendar(viewingPartner ? partnerData?.id : currentUserId); } catch (e) { /* briefing still works with [] */ }
   updateCalendarReauthBanner();
 
   const now = Date.now();
@@ -5196,17 +5260,19 @@ function dismissTodayCalendarNotice() {
   renderToday();
 }
 
-async function loadTodayCalendar({ force = false } = {}) {
+async function loadTodayCalendar({ force = false, userId = currentUserId } = {}) {
   // Short-circuit if the user has never connected — don't trigger ensureCalendarToken's
   // auto-redirect for a user who's about to see their first Today render.
-  if (!readStoredGcalToken()) {
+  // Self path uses the existing localStorage gate; partner path skips this and
+  // relies on the server resolver to surface "no calendar" via 404.
+  if (userId === currentUserId && !readStoredGcalToken()) {
     todayCalendarEvents = [];
     todayCalendarError = 'CALENDAR_NOT_CONNECTED';
     return;
   }
   try {
     if (force) clearCalendarCache();
-    const events = await fetchCalendarPrimary();
+    const events = await fetchCalendarPrimary(new Date(), userId);
     todayCalendarEvents = Array.isArray(events) ? events : [];
     todayCalendarError = null;
     calendarAuthExpired = false;
@@ -6835,6 +6901,10 @@ async function switchView(mode) {
   briefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   tomorrowBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   horizonBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
+  // Phase 2b — also clear calendar caches so partner switch doesn't serve stale self data
+  clearCalendarCache();
+  calendarRangeCache = { key: null, events: null, fetchedAt: 0 };
+  calendarListCache = { list: null, fetchedAt: 0 };
 
   if (mode === 'partner') {
     if (!partnerData) {

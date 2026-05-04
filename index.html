@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+  .life-areas-hidden { display: none !important; }
   :root {
     --bg: #0a0a0f;
     --surface: #12121a;
@@ -924,7 +925,7 @@
         <span style="font-size:13px;">💑</span>
         <span style="font-size:12px;color:var(--text2);">Partner View</span>
       </div>
-      <div style="display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 12px;">
+      <div class="life-areas-hidden" style="display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 12px;">
         <span style="font-size:13px;">⚖️</span>
         <span style="font-size:12px;color:var(--text2);">Life Balance</span>
       </div>
@@ -958,7 +959,7 @@
       <div class="ob-step active" id="step-dot-1"></div>
       <div class="ob-step" id="step-dot-3"></div>
       <div class="ob-step" id="step-dot-4"></div>
-      <div class="ob-step" id="step-dot-5"></div>
+      <div class="ob-step life-areas-hidden" id="step-dot-5"></div>
       <div class="ob-step" id="step-dot-6"></div>
     </div>
 
@@ -971,7 +972,7 @@
           <span style="font-size:16px;">💑</span>
           <div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">Built for couples</div><div style="font-size:12px;color:var(--text2);">Link with your partner to share tasks, a combined life score, and a daily digest.</div></div>
         </div>
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
+        <div class="life-areas-hidden" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;">
           <span style="font-size:16px;">⚖️</span>
           <div><div style="font-size:13px;font-weight:600;margin-bottom:2px;">Life Balance Score</div><div style="font-size:12px;color:var(--text2);">Track your weekly balance across the areas that matter most — Marriage, Work, Health, Faith, and more.</div></div>
         </div>
@@ -1052,12 +1053,12 @@
       </div>
       <div style="display:flex;gap:10px;">
         <button onclick="obBack(4)" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
-        <button onclick="obNext(4)" style="flex:2;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Continue →</button>
+        <button onclick="obNextSkip5()" style="flex:2;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;">Continue →</button>
       </div>
     </div>
 
     <!-- Step 5: Life Balance -->
-    <div id="ob-step-5" style="display:none;">
+    <div id="ob-step-5" class="life-areas-hidden" style="display:none;">
       <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:8px;">Your Life Areas ⚖️</div>
       <div style="color:var(--text2);font-size:14px;line-height:1.6;margin-bottom:16px;">These are the areas STWRD sorts your tasks into. We've pre-selected the core ones — deselect any that don't apply to your life.</div>
 
@@ -1104,7 +1105,7 @@
 <div style="margin-bottom:32px;"></div>
 
       <div style="display:flex;gap:10px;">
-        <button onclick="obBack(6)" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
+        <button onclick="obBackSkip5()" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">← Back</button>
         <button onclick="completeOnboarding()" style="flex:2;padding:14px 10px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap;">Let's go →</button>
       </div>
     </div>
@@ -1431,7 +1432,7 @@
         <button onclick="saveHatKnowledge()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:white;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;">Save Knowledge</button>
       </div>
     </div>
-    <div class="settings-section">
+    <div class="settings-section life-areas-hidden">
       <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
         <div class="settings-label" style="font-weight:600;margin-bottom:4px;">⚖️ Life Areas</div>
         <div class="settings-value" style="margin-bottom:12px;">Customize the areas STWRD sorts your tasks into. Add, rename, or remove areas to match your life.</div>
@@ -1440,7 +1441,7 @@
       </div>
     </div>
 
-    <div class="settings-section">
+    <div class="settings-section life-areas-hidden">
       <div class="settings-row" style="cursor:default;flex-direction:column;align-items:flex-start;">
         <div class="settings-label" style="font-weight:600;margin-bottom:4px;">🧠 Life Area Keywords</div>
         <div class="settings-value" style="margin-bottom:12px;">These keywords tell STWRD which life area each task belongs to. Your hat names are matched automatically. Edit to fine-tune.</div>
@@ -6336,6 +6337,24 @@ function obBackSkip2(step) {
   document.getElementById('step-dot-3').classList.remove('done');
   document.getElementById('step-dot-1').classList.remove('done');
   document.getElementById('step-dot-1').classList.add('active');
+  document.getElementById('onboardingScreen').scrollTop = 0;
+}
+
+function obNextSkip5() {
+  document.getElementById('ob-step-4').style.display = 'none';
+  document.getElementById('ob-step-6').style.display = 'block';
+  document.getElementById('step-dot-4').classList.remove('active');
+  document.getElementById('step-dot-4').classList.add('done');
+  document.getElementById('step-dot-6').classList.add('active');
+  document.getElementById('onboardingScreen').scrollTop = 0;
+}
+
+function obBackSkip5() {
+  document.getElementById('ob-step-6').style.display = 'none';
+  document.getElementById('ob-step-4').style.display = 'block';
+  document.getElementById('step-dot-6').classList.remove('active');
+  document.getElementById('step-dot-4').classList.remove('done');
+  document.getElementById('step-dot-4').classList.add('active');
   document.getElementById('onboardingScreen').scrollTop = 0;
 }
 

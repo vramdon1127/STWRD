@@ -1885,7 +1885,12 @@ sbClient.auth.onAuthStateChange(async (event, session) => {
       writeGcalToken(session.provider_token);
       console.log('[STWRD] gcal token captured via session');
     } else if (!readStoredGcalToken()) {
-      console.warn('[STWRD] no provider_token on session — calendar features will prompt for re-auth');
+      // Try server-side refresh before giving up. Warning fires only if
+      // refresh ALSO fails (no stored refresh_token, revoked grant, etc).
+      const refreshed = await refreshGcalToken(session.user?.id);
+      if (!refreshed) {
+        console.warn('[STWRD] no provider_token on session — calendar features will prompt for re-auth');
+      }
     }
     // Replace history so swipe-back doesn't return to login screen,
     // but preserve the ?invite= param so partner linking still works
@@ -2101,6 +2106,46 @@ function clearGcalToken() {
   localStorage.removeItem(GCAL_STORAGE_KEY);
 }
 
+// Mint a fresh Google access token via the server-side refresh endpoint
+// (api/refresh-gcal-token) using the user's stored provider_refresh_token.
+// Returns the new access token on success, null on any failure (no stored
+// refresh token, revoked grant, network error). Callers should treat null
+// as "fall through to existing re-auth path" — this is a best-effort
+// short-circuit, not a guarantee.
+async function refreshGcalToken(userId) {
+  if (!userId) return null;
+  let jwt = null;
+  try {
+    const raw = localStorage.getItem('stwrd-auth');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      jwt = parsed?.access_token || parsed?.currentSession?.access_token || null;
+    }
+  } catch (e) {}
+  if (!jwt) return null;
+
+  try {
+    const res = await fetch('/api/refresh-gcal-token', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.log('[STWRD] gcal refresh failed:', res.status, body.error || '');
+      return null;
+    }
+    const { access_token, expires_in } = await res.json();
+    if (!access_token) return null;
+    writeGcalToken(access_token, (expires_in || 3600) * 1000);
+    console.log(`[STWRD] gcal token refreshed via /api/refresh-gcal-token, expires in ${expires_in}s`);
+    return access_token;
+  } catch (e) {
+    console.warn('[STWRD] gcal refresh threw:', e);
+    return null;
+  }
+}
+
 // Loop E: User-triggered reconnect from the calendar-expired banner. Wipes
 // stored token + every cache so the post-OAuth render starts from a clean
 // slate. Uses the interactive prompt (no silent=true) because the user just
@@ -2157,6 +2202,11 @@ async function initiateGcalReauth({ silent = false } = {}) {
 async function ensureCalendarToken() {
   const cached = readStoredGcalToken();
   if (cached) return cached;
+
+  // Try server-side refresh before navigating away for re-auth — avoids a
+  // full OAuth round trip when the user has a valid refresh_token on file.
+  const refreshed = await refreshGcalToken(currentUserId);
+  if (refreshed) return refreshed;
 
   let silentRes;
   try {

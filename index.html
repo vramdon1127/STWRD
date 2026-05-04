@@ -2210,6 +2210,15 @@ async function getCalendarTokenForUser(userId) {
   return access_token;
 }
 
+// Phase C2 — resolve which user's calendar+iCal a self-view briefing should pull from.
+// If the current user has set calendar_source_user_id (e.g. Mia routes to Vijay's
+// gcal because the family calendar lives there), return that instead.
+// Partner-view (when displayUserId !== currentUserId) is unaffected.
+function resolveBriefCalendarUserId(displayUserId) {
+  if (displayUserId !== currentUserId) return displayUserId;
+  return currentUserProfile?.calendar_source_user_id || currentUserId;
+}
+
 // List the user's subscribed calendars. Cached 1 hour because subscriptions
 // rarely change. Returns [{ id, summary, primary, selected, accessRole }].
 // Used to query events across every calendar the user has turned on in
@@ -4463,12 +4472,12 @@ async function renderBriefing() {
 
   // Warm the calendar cache. Cheap hit if Today was already visited; at most
   // one fetch the first time Dashboard opens in a session.
-  try { await loadTodayCalendar({ userId: viewingPartner ? partnerData?.id : currentUserId }); } catch (e) { /* briefing still works with empty events */ }
+  try { await loadTodayCalendar({ userId: resolveBriefCalendarUserId(viewingPartner ? partnerData?.id : currentUserId) }); } catch (e) { /* briefing still works with empty events */ }
   updateCalendarReauthBanner();
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const fingerprint = `${today}|${BRIEFING_VERSION}|${viewingPartner ? partnerData.id : currentUserId}|${briefingTaskFingerprint()}`;
+  const fingerprint = `${today}|${BRIEFING_VERSION}|${resolveBriefCalendarUserId(viewingPartner ? partnerData.id : currentUserId)}|${briefingTaskFingerprint()}`;
   const cacheHit = briefingCache.fingerprint === fingerprint
     && briefingCache.text
     && (now - briefingCache.ts) < BRIEFING_CACHE_TTL_MS;
@@ -4604,12 +4613,12 @@ async function renderTomorrowBriefing() {
 
   // Tomorrow piggybacks on the 7-day horizon fetch — this is a no-op when
   // renderHorizonBriefing already warmed it on the same render pass.
-  try { await loadHorizonCalendar(viewingPartner ? partnerData?.id : currentUserId); } catch (e) { /* still works with [] */ }
+  try { await loadHorizonCalendar(resolveBriefCalendarUserId(viewingPartner ? partnerData?.id : currentUserId)); } catch (e) { /* still works with [] */ }
   updateCalendarReauthBanner();
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const fingerprint = `${today}|${BRIEFING_VERSION}|${viewingPartner ? partnerData.id : currentUserId}|${tomorrowTaskFingerprint()}`;
+  const fingerprint = `${today}|${BRIEFING_VERSION}|${resolveBriefCalendarUserId(viewingPartner ? partnerData.id : currentUserId)}|${tomorrowTaskFingerprint()}`;
   const cacheHit = tomorrowBriefingCache.fingerprint === fingerprint
     && tomorrowBriefingCache.text
     && (now - tomorrowBriefingCache.ts) < TOMORROW_BRIEFING_CACHE_TTL_MS;
@@ -4774,12 +4783,12 @@ async function renderHorizonBriefing() {
 
   // Load 7-day event window. Own cache (calendarRangeCache, 30 min) so this
   // doesn't thrash Loop C's single-day calendarCache.
-  try { await loadHorizonCalendar(viewingPartner ? partnerData?.id : currentUserId); } catch (e) { /* briefing still works with [] */ }
+  try { await loadHorizonCalendar(resolveBriefCalendarUserId(viewingPartner ? partnerData?.id : currentUserId)); } catch (e) { /* briefing still works with [] */ }
   updateCalendarReauthBanner();
 
   const now = Date.now();
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const fingerprint = `${today}|${BRIEFING_VERSION}|${viewingPartner ? partnerData.id : currentUserId}|${horizonTaskFingerprint()}`;
+  const fingerprint = `${today}|${BRIEFING_VERSION}|${resolveBriefCalendarUserId(viewingPartner ? partnerData.id : currentUserId)}|${horizonTaskFingerprint()}`;
   const cacheHit = horizonBriefingCache.fingerprint === fingerprint
     && horizonBriefingCache.text
     && (now - horizonBriefingCache.ts) < HORIZON_BRIEFING_CACHE_TTL_MS;

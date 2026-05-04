@@ -2407,7 +2407,10 @@ const GCAL_RANGE_CACHE_TTL_MS = 30 * 60 * 1000;
 let calendarRangeCache = new Map(); // userId -> { key, events, fetchedAt }
 
 async function fetchCalendarEventsRange(startDate, endDate, userId = currentUserId) {
-  if (userId === currentUserId && !readStoredGcalToken()) return [];
+  // Decide gcal vs iCal availability up front. Self path with no localStorage
+  // gcal token used to early-return [] here; with iCal in the mix we skip the
+  // gcal branch instead so an iCal-only user still gets events.
+  const skipGcal = userId === currentUserId && !readStoredGcalToken();
 
   const startMs = new Date(startDate);
   startMs.setHours(0, 0, 0, 0);
@@ -2425,77 +2428,133 @@ async function fetchCalendarEventsRange(startDate, endDate, userId = currentUser
     return cachedRange.events;
   }
 
-  let calendars;
-  try {
-    const all = await listUserCalendars(userId);
-    calendars = all.filter(c => c.selected && !isHolidayCalendar(c));
-    if (calendars.length === 0) {
-      calendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
+  // ── gcal branch ────────────────────────────────────────────────
+  let gcalResults = [];
+  let gcalCalendars = [];
+  let authExpired = null;
+  if (!skipGcal) {
+    try {
+      const all = await listUserCalendars(userId);
+      gcalCalendars = all.filter(c => c.selected && !isHolidayCalendar(c));
+      if (gcalCalendars.length === 0) {
+        gcalCalendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
+      }
+    } catch (listErr) {
+      console.warn('[Calendar] range: calendarList failed, falling back to primary:', listErr?.code || listErr?.message);
+      gcalCalendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
     }
-  } catch (listErr) {
-    console.warn('[Calendar] range: calendarList failed, falling back to primary:', listErr?.code || listErr?.message);
-    calendars = [{ id: 'primary', summary: 'Primary', primary: true, selected: true }];
+
+    const token = await getCalendarTokenForUser(userId);
+    if (token) {
+      const buildUrl = (calId) =>
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
+        + `?timeMin=${encodeURIComponent(timeMin)}`
+        + `&timeMax=${encodeURIComponent(timeMax)}`
+        + `&singleEvents=true&orderBy=startTime&maxResults=250`;
+
+      gcalResults = await Promise.all(gcalCalendars.map(async (cal) => {
+        try {
+          const res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${token}` } });
+          if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              throw new CalendarAuthExpiredError(res.status);
+            }
+            console.warn(`[Calendar] range "${cal.summary}" returned ${res.status}, skipping`);
+            return { ok: false, events: [] };
+          }
+          const data = await res.json();
+          const events = (data.items || []).map(ev => {
+            // Attendee count excludes the user themselves and declined attendees.
+            const attendeeCount = Array.isArray(ev.attendees)
+              ? ev.attendees.filter(a => !a.self && a.responseStatus !== 'declined').length
+              : 0;
+            return {
+              id: ev.id,
+              summary: ev.summary,
+              start: ev.start,
+              end: ev.end,
+              location: ev.location,
+              description: ev.description,
+              attendee_count: attendeeCount,
+              _calendarId: cal.id,
+              _calendarName: cal.summary,
+            };
+          });
+          return { ok: true, events };
+        } catch (e) {
+          if (e instanceof CalendarAuthExpiredError) {
+            authExpired = e;
+            return { ok: false, events: [] };
+          }
+          console.warn(`[Calendar] range "${cal.summary}" fetch threw:`, e?.message || e);
+          return { ok: false, events: [] };
+        }
+      }));
+    }
   }
 
-  const token = await getCalendarTokenForUser(userId);
-  if (!token) return [];
-
-  const buildUrl = (calId) =>
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
-    + `?timeMin=${encodeURIComponent(timeMin)}`
-    + `&timeMax=${encodeURIComponent(timeMax)}`
-    + `&singleEvents=true&orderBy=startTime&maxResults=250`;
-
-  const results = await Promise.all(calendars.map(async (cal) => {
+  // ── iCal branch ────────────────────────────────────────────────
+  // Only call /api/fetch-ical when (self with feed configured) OR (override/partner —
+  // server resolves the feed from the target profile). Avoids the round-trip for
+  // self users who haven't set up iCal.
+  const wantIcal = (userId === currentUserId && !!currentUserProfile?.ical_feed_url)
+                || (userId !== currentUserId);
+  let icalEvents = [];
+  if (wantIcal) {
     try {
-      const res = await fetch(buildUrl(cal.id), { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          throw new CalendarAuthExpiredError(res.status);
+      let jwt = null;
+      try {
+        const raw = localStorage.getItem('stwrd-auth');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          jwt = parsed?.access_token || parsed?.currentSession?.access_token || null;
         }
-        console.warn(`[Calendar] range "${cal.summary}" returned ${res.status}, skipping`);
-        return { ok: false, events: [] };
+      } catch (e) { /* fall through, jwt null */ }
+      if (jwt) {
+        const icalRes = await fetch('/api/fetch-ical', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${jwt}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ userId, timeMin, timeMax })
+        });
+        if (icalRes.ok) {
+          const body = await icalRes.json();
+          icalEvents = Array.isArray(body?.events) ? body.events : [];
+        } else if (icalRes.status !== 404) {
+          // 404 = no_ical_feed (graceful no-op). Other errors are logged but
+          // don't fail the whole fetch — gcal events still surface.
+          console.warn('[iCal] fetch-ical returned', icalRes.status);
+        }
       }
-      const data = await res.json();
-      const events = (data.items || []).map(ev => {
-        // Attendee count excludes the user themselves and declined attendees.
-        const attendeeCount = Array.isArray(ev.attendees)
-          ? ev.attendees.filter(a => !a.self && a.responseStatus !== 'declined').length
-          : 0;
-        return {
-          id: ev.id,
-          summary: ev.summary,
-          start: ev.start,
-          end: ev.end,
-          location: ev.location,
-          description: ev.description,
-          attendee_count: attendeeCount,
-          _calendarId: cal.id,
-          _calendarName: cal.summary,
-        };
-      });
-      return { ok: true, events };
     } catch (e) {
-      if (e instanceof CalendarAuthExpiredError) throw e;
-      console.warn(`[Calendar] range "${cal.summary}" fetch threw:`, e?.message || e);
-      return { ok: false, events: [] };
+      console.warn('[iCal] fetch-ical threw:', e?.message || e);
     }
-  }));
+  }
 
-  if (calendars.length > 0 && !results.some(r => r.ok)) {
-    const err = new Error('CALENDAR_NETWORK_ERROR');
-    err.code = 'CALENDAR_NETWORK_ERROR';
-    throw err;
+  // ── merge + dedupe ─────────────────────────────────────────────
+  // If gcal had calendars to query AND every one failed AND iCal returned
+  // nothing AND we hit an auth-expired error, surface it so the reconnect
+  // banner flips. If iCal saved us, swallow gcal failure.
+  if (authExpired && gcalCalendars.length > 0
+      && !gcalResults.some(r => r.ok) && icalEvents.length === 0) {
+    throw authExpired;
   }
 
   const seen = new Set();
   const merged = [];
-  for (const { events } of results) {
+  for (const { events } of gcalResults) {
     for (const ev of events) {
       if (!ev.id || seen.has(ev.id)) continue;
       seen.add(ev.id);
       merged.push(ev);
     }
+  }
+  for (const ev of icalEvents) {
+    if (!ev.id || seen.has(ev.id)) continue;
+    seen.add(ev.id);
+    merged.push(ev);
   }
   const evStartMs = (ev) => ev.start?.dateTime ? Date.parse(ev.start.dateTime)
                          : ev.start?.date     ? Date.parse(ev.start.date)

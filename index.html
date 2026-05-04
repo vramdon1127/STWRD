@@ -2078,7 +2078,7 @@ function clearGcalToken() {
 async function reconnectGcal() {
   clearGcalToken();
   clearCalendarCache();
-  calendarRangeCache = { key: null, events: null, fetchedAt: 0 };
+  calendarRangeCache.clear();
   briefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   tomorrowBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   horizonBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
@@ -2224,12 +2224,13 @@ function resolveBriefCalendarUserId(displayUserId) {
 // Used to query events across every calendar the user has turned on in
 // Google Calendar (work, family, HoneyBook, etc.), minus holiday calendars.
 const GCAL_LIST_TTL_MS = 60 * 60 * 1000;
-let calendarListCache = { list: null, fetchedAt: 0 };
+let calendarListCache = new Map(); // userId -> { list, fetchedAt }
 
 async function listUserCalendars(userId = currentUserId) {
   const now = Date.now();
-  if (calendarListCache.list && (now - calendarListCache.fetchedAt) < GCAL_LIST_TTL_MS) {
-    return calendarListCache.list;
+  const cached = calendarListCache.get(userId);
+  if (cached && cached.list && (now - cached.fetchedAt) < GCAL_LIST_TTL_MS) {
+    return cached.list;
   }
   const token = await getCalendarTokenForUser(userId);
   if (!token) return [];
@@ -2268,7 +2269,7 @@ async function listUserCalendars(userId = currentUserId) {
     selected: c.selected !== false,
     accessRole: c.accessRole,
   }));
-  calendarListCache = { list, fetchedAt: now };
+  calendarListCache.set(userId, { list, fetchedAt: now });
   return list;
 }
 
@@ -2403,7 +2404,7 @@ async function fetchCalendarPrimary(date = new Date(), userId = currentUserId) {
 // does not thrash Loop C's single-day calendarCache, which the Today view
 // depends on.
 const GCAL_RANGE_CACHE_TTL_MS = 30 * 60 * 1000;
-let calendarRangeCache = { key: null, events: null, fetchedAt: 0 };
+let calendarRangeCache = new Map(); // userId -> { key, events, fetchedAt }
 
 async function fetchCalendarEventsRange(startDate, endDate, userId = currentUserId) {
   if (userId === currentUserId && !readStoredGcalToken()) return [];
@@ -2416,10 +2417,12 @@ async function fetchCalendarEventsRange(startDate, endDate, userId = currentUser
   const timeMax = endMs.toISOString();
   const cacheKey = `${timeMin}|${timeMax}`;
   const now = Date.now();
-  if (calendarRangeCache.key === cacheKey
-      && calendarRangeCache.events
-      && (now - calendarRangeCache.fetchedAt) < GCAL_RANGE_CACHE_TTL_MS) {
-    return calendarRangeCache.events;
+  const cachedRange = calendarRangeCache.get(userId);
+  if (cachedRange
+      && cachedRange.key === cacheKey
+      && cachedRange.events
+      && (now - cachedRange.fetchedAt) < GCAL_RANGE_CACHE_TTL_MS) {
+    return cachedRange.events;
   }
 
   let calendars;
@@ -2499,7 +2502,7 @@ async function fetchCalendarEventsRange(startDate, endDate, userId = currentUser
                          :                      Infinity;
   merged.sort((a, b) => evStartMs(a) - evStartMs(b));
 
-  calendarRangeCache = { key: cacheKey, events: merged, fetchedAt: now };
+  calendarRangeCache.set(userId, { key: cacheKey, events: merged, fetchedAt: now });
   return merged;
 }
 
@@ -4814,7 +4817,7 @@ async function renderHorizonBriefing() {
 function refreshHorizonBriefing() {
   // Only invalidate horizon state — today briefing is independent.
   horizonBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
-  calendarRangeCache = { key: null, events: null, fetchedAt: 0 };
+  calendarRangeCache.clear();
   renderHorizonBriefing();
 }
 
@@ -6912,8 +6915,8 @@ async function switchView(mode) {
   horizonBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   // Phase 2b — also clear calendar caches so partner switch doesn't serve stale self data
   clearCalendarCache();
-  calendarRangeCache = { key: null, events: null, fetchedAt: 0 };
-  calendarListCache = { list: null, fetchedAt: 0 };
+  calendarRangeCache.clear();
+  calendarListCache.clear();
 
   if (mode === 'partner') {
     if (!partnerData) {

@@ -756,6 +756,15 @@
   }
   .save-btn:hover { opacity: 0.9; }
 
+  .settings-status {
+    margin-top: 8px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    min-height: 16px;
+  }
+  .settings-status.success { color: var(--done); }
+  .settings-status.error   { color: var(--p1); }
+
 
   /* ONBOARDING */
   .ob-step {
@@ -1379,6 +1388,26 @@
         <input type="hidden" id="resendKeyInput">
         <button class="save-btn" onclick="saveDigestSettings()">Save & Enable Digest</button>
         <button onclick="testDigest()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">Send Test Email Now</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;cursor:default;">
+        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">📅 Calendar Feed URL</div>
+        <div class="settings-value" style="margin-bottom:8px;">Paste an iCal or webcal link to add Apple Calendar, Outlook, school, or sports schedules to your daily brief.</div>
+        <input type="url" class="api-input" id="icalFeedUrlInput" placeholder="https://... or webcal://...">
+        <button class="save-btn" onclick="saveIcalFeedUrl()">Save Feed URL</button>
+        <div id="icalFeedUrlStatus" class="settings-status"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;cursor:default;">
+        <div class="settings-label" style="font-weight:600;margin-bottom:4px;">🔁 Partner Calendar Override</div>
+        <div class="settings-value" style="margin-bottom:8px;">Advanced: paste your partner's user ID to use their Google Calendar as the source for shared briefs. Leave blank for normal behavior.</div>
+        <input type="text" class="api-input" id="partnerOverrideInput" placeholder="UUID or leave blank">
+        <button class="save-btn" onclick="savePartnerOverride()">Save Partner Override</button>
+        <div id="partnerOverrideStatus" class="settings-status"></div>
       </div>
     </div>
 
@@ -5025,7 +5054,7 @@ function showView(name) {
   document.getElementById(`nav-${name}`).classList.add('active');
   if (name === 'brief') { renderBriefing(); renderTomorrowBriefing(); renderHorizonBriefing(); }
   if (name === 'stats') renderStats();
-  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); renderKeywordEditor(); renderLifeAreasEditor(); }
+  if (name === 'settings') { loadHatEditor(); loadDigestSettings(); loadCalendarSettings(); renderKeywordEditor(); renderLifeAreasEditor(); }
   if (name === 'today') {
     renderToday();
     startTodayAutoRefresh();
@@ -6746,6 +6775,64 @@ async function loadDigestSettings() {
     if (data?.digest_email) document.getElementById('digestEmailInput').value = data.digest_email;
     if (data?.resend_key) document.getElementById('resendKeyInput').value = data.resend_key;
   } catch(e) {}
+}
+
+// ─── CALENDAR SETTINGS (iCal feed URL + partner override) ─────
+// Pre-populates the two inputs from currentUserProfile (already loaded with
+// select=*). On save: PATCH the row, then write the new value back to
+// currentUserProfile so brief renders pick it up without a reload.
+
+function loadCalendarSettings() {
+  const icalEl = document.getElementById('icalFeedUrlInput');
+  const partnerEl = document.getElementById('partnerOverrideInput');
+  if (icalEl) icalEl.value = currentUserProfile?.ical_feed_url || '';
+  if (partnerEl) partnerEl.value = currentUserProfile?.calendar_source_user_id || '';
+  setSettingsStatus('icalFeedUrlStatus', '');
+  setSettingsStatus('partnerOverrideStatus', '');
+}
+
+function setSettingsStatus(elId, message, kind) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = message || '';
+  el.className = 'settings-status' + (kind ? ' ' + kind : '');
+}
+
+async function saveIcalFeedUrl() {
+  const value = document.getElementById('icalFeedUrlInput').value.trim();
+  if (value && !/^(https?:\/\/|webcal:\/\/)/i.test(value)) {
+    setSettingsStatus('icalFeedUrlStatus',
+      'URL must start with http://, https://, or webcal://', 'error');
+    return;
+  }
+  const next = value || null;
+  try {
+    await sbFetch(`profiles?id=eq.${currentUserId}`, 'PATCH', { ical_feed_url: next });
+    if (currentUserProfile) currentUserProfile.ical_feed_url = next;
+    setSettingsStatus('icalFeedUrlStatus', 'Saved.', 'success');
+  } catch (e) {
+    setSettingsStatus('icalFeedUrlStatus',
+      'Save failed: ' + (e?.message || 'unknown error'), 'error');
+  }
+}
+
+async function savePartnerOverride() {
+  const value = document.getElementById('partnerOverrideInput').value.trim();
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (value && !UUID_RE.test(value)) {
+    setSettingsStatus('partnerOverrideStatus',
+      'Must be a valid UUID (or blank to clear).', 'error');
+    return;
+  }
+  const next = value || null;
+  try {
+    await sbFetch(`profiles?id=eq.${currentUserId}`, 'PATCH', { calendar_source_user_id: next });
+    if (currentUserProfile) currentUserProfile.calendar_source_user_id = next;
+    setSettingsStatus('partnerOverrideStatus', 'Saved.', 'success');
+  } catch (e) {
+    setSettingsStatus('partnerOverrideStatus',
+      'Save failed: ' + (e?.message || 'unknown error'), 'error');
+  }
 }
 
 // ─── VOICE INPUT ──────────────────────────────────────────────

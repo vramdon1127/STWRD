@@ -4329,7 +4329,9 @@ function composeBriefingContext(windowType = 'today') {
                       : ev?.start?.date     ? Date.parse(ev.start.date)
                       :                       null;
         const endMs = ev?.end?.dateTime ? Date.parse(ev.end.dateTime) : null;
-        const localDate = startMs ? new Date(startMs).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }) : null;
+        const localDate = allDay
+          ? ev.start.date
+          : (startMs ? new Date(startMs).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }) : null);
         return {
           title: ev.summary || '(untitled)',
           date: localDate,
@@ -4419,7 +4421,9 @@ function composeBriefingContext(windowType = 'today') {
                     : ev?.start?.date     ? Date.parse(ev.start.date)
                     :                       null;
       const endMs = ev?.end?.dateTime ? Date.parse(ev.end.dateTime) : null;
-      const localDate = startMs ? new Date(startMs).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }) : null;
+      const localDate = allDay
+        ? ev.start.date
+        : (startMs ? new Date(startMs).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }) : null);
       return {
         title: ev.summary || '(untitled)',
         date: localDate,

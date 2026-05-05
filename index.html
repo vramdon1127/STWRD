@@ -4275,6 +4275,26 @@ const BRIEFING_VERSION = 'h';
 // 'tomorrow' (Loop G), and 'horizon' (Loop D-2). All branches emit
 // {date, day_name, relative_label} on every date-bearing field so the
 // model doesn't infer day-of-week.
+// Detect personal-milestone calendar entries (birthdays, anniversaries, major
+// US holidays). Used by the Horizon brief sort to elevate these above ordinary
+// all-day events (e.g. "Out of Office", "Conference Day 1") so they don't get
+// buried at the bottom of a meeting-heavy week. All-day-only by design — a
+// timed event titled "Birthday dinner with Mia" is a regular meeting, not a
+// milestone.
+function isMilestoneEvent(event) {
+  if (!event?.all_day) return false;
+  const title = (event.title || '').toLowerCase().replace(/['']/g, '').trim();
+  if (!title) return false;
+  if (title.includes('birthday') || title.includes('bday')) return true;
+  if (title.includes('anniversary')) return true;
+  const holidays = [
+    'mothers day', 'fathers day', 'thanksgiving', 'christmas',
+    'new years', 'valentines day', 'easter', 'independence day',
+    'memorial day', 'labor day', 'fourth of july', '4th of july'
+  ];
+  return holidays.some(h => title.includes(h));
+}
+
 function composeBriefingContext(windowType = 'today') {
   const nowDate = new Date();
   // Anchor "today" to Chicago-local calendar date so this works regardless of
@@ -4380,7 +4400,7 @@ function composeBriefingContext(windowType = 'today') {
   }
 
   if (windowType === 'horizon') {
-    const HORIZON_EVENT_DAYS = 7;
+    const HORIZON_EVENT_DAYS = 14;
     const HORIZON_TASK_DAYS = 14;
 
     const dayOf = (dateStr) => {
@@ -4415,9 +4435,12 @@ function composeBriefingContext(windowType = 'today') {
 
     const horizon_events = [...horizonEventMapped]
       .sort((a, b) => {
-        // Primary: attendee-having meetings first (signal). Secondary: chrono.
-        const aRank = a.attendee_count > 0 ? 0 : (a.all_day ? 2 : 1);
-        const bRank = b.attendee_count > 0 ? 0 : (b.all_day ? 2 : 1);
+        // Primary: attendee-having meetings AND milestone all-day events
+        // (birthdays, anniversaries, major US holidays) tie for top rank.
+        // Other all-day events (Out of Office, Conference Day 1) stay rank 2.
+        // Secondary: chrono.
+        const aRank = a.attendee_count > 0 ? 0 : (isMilestoneEvent(a) ? 0 : (a.all_day ? 2 : 1));
+        const bRank = b.attendee_count > 0 ? 0 : (isMilestoneEvent(b) ? 0 : (b.all_day ? 2 : 1));
         if (aRank !== bRank) return aRank - bRank;
         const ak = (a.days_from_now ?? 0) * 10000 + (a.time ? 0 : 1);
         const bk = (b.days_from_now ?? 0) * 10000 + (b.time ? 0 : 1);
@@ -4536,6 +4559,8 @@ Write a 2-3 sentence briefing about their day. Be warm but observational — not
 If shared-calendar events involving family members or a partner are present in the context, reference them by name when relevant — these are part of the household's life, not separate.
 
 All-day events on a personal or business calendar are often significant commitments — DJ gigs, weddings, paid bookings, medical appointments, travel days, conferences, deadlines that anchor the day. Surface them by name when present. Do not treat a day with an all-day event as "open" or "light" just because the timed-events array is short — the all-day commitment may BE the day.
+
+If today is a personal milestone — Mia's or someone close's birthday or anniversary, or a major US holiday like Mother's Day, Father's Day, Thanksgiving, Christmas, New Year's, Valentine's Day, Easter, Independence Day, Memorial Day, or Labor Day — lead with it. Frame with action, not announcement: "Today is Mia's birthday — make sure her morning starts with the gift or breakfast you planned" rather than "Note: it's Mia's birthday." Don't bury the milestone behind work meetings.
 
 Do NOT:
 - When referring to a day or date, use EXACTLY the date, day_name, and relative_label values from the context. Do NOT compute day-of-week yourself. Do NOT invent new date/day pairings. If an event's day_name is "Tuesday" and its date is "2026-04-28", refer to it as "Tuesday 4/28" or "Tuesday the 28th" or "next Tuesday" — never as any other day name.
@@ -4685,6 +4710,8 @@ Be warm but observational. Notice the SHAPE of tomorrow — heavy morning, clear
 
 All-day events on a personal or business calendar are often significant commitments — DJ gigs, weddings, paid bookings, medical appointments, travel days, conferences, deadlines that anchor the day. Surface them by name when present. Do not treat a day with an all-day event as "open" or "light" just because the timed-events array is short — the all-day commitment may BE the day.
 
+If tomorrow is a personal milestone — a birthday, anniversary, or major US holiday like Mother's Day, Father's Day, Thanksgiving, Christmas, New Year's, Valentine's Day, Easter, Independence Day, Memorial Day, or Labor Day — lead with the prep, not the announcement. "Tomorrow is Mother's Day. Tonight is the last window to wrap the gift, lock brunch, or write the card." Don't bury it behind work prep.
+
 Use EXACTLY the date, day_name, and relative_label values from the context. Do NOT compute day-of-week yourself.
 
 Do NOT:
@@ -4815,11 +4842,17 @@ function horizonTaskFingerprint() {
     .join(',');
 }
 
-const HORIZON_BRIEFING_SYSTEM_PROMPT = `You are an advisor for someone managing a busy household — work, family, side businesses, and a marriage. You know their calendar for the next 7 days and their upcoming task deadlines over the next 2 weeks.
+const HORIZON_BRIEFING_SYSTEM_PROMPT = `You are an advisor for someone managing a busy household — work, family, side businesses, and a marriage. You know their calendar for the next 14 days and their upcoming task deadlines over the next 2 weeks.
 
 Write a 2-3 sentence forward-looking briefing about the week ahead. Notice the SHAPE of the coming days — which days are heavy versus clear, what deadlines are landing when, what needs prep now for something later. Reference specific days, meetings, and projects by name when it adds signal.
 
 If shared-calendar events involving family members or a partner are present in the context, reference them by name when relevant — these are part of the household's life, not separate.
+
+Personal milestones in the next 14 days are priority signals — surface them prominently. Look for: birthdays (event titles like "Mia's Birthday" or "[name]'s birthday"), anniversaries, and major US holidays (Mother's Day, Father's Day, Thanksgiving, Christmas, New Year's, Valentine's Day, Easter, Independence Day, Memorial Day, Labor Day). When you find one:
+- 2-7 days out: include in the week ahead with lead-time framing — "Sunday is Mother's Day. If you haven't planned something for Mia, today is the day — brunch reservations book up and a thoughtful gift takes a few days to arrive."
+- 8-14 days out: include as a brief lookahead — "Mia's birthday lands Thursday May 14, 10 days out. Enough runway to plan a real moment — dinner reservation, gift, or both."
+
+Milestones lead, tactical work follows.
 
 Be the kind of advisor who says "Tuesday is going to be rough, and the Workiva deadline lands Friday — you'll want to start on that Sunday night" rather than listing what's on the calendar.
 
@@ -4854,7 +4887,7 @@ async function loadHorizonCalendar(userId = currentUserId) {
   try {
     const start = new Date();
     const end = new Date();
-    end.setDate(end.getDate() + 6);
+    end.setDate(end.getDate() + 13);
     horizonCalendarEvents = await fetchCalendarEventsRange(start, end, userId);
     calendarAuthExpired = false;
   } catch (e) {

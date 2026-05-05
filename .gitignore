@@ -1,1 +1,7 @@
 .claude-tests/
+
+# macOS metadata
+.DS_Store
+
+# Claude Code worktrees and session data
+.claude/

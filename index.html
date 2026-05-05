@@ -2354,9 +2354,9 @@ async function listUserCalendars(userId = currentUserId) {
 }
 
 function isHolidayCalendar(cal) {
-  if (!cal) return false;
-  if (String(cal.id || '').includes('#holiday@')) return true;
-  if (String(cal.summary || '').toLowerCase().startsWith('holidays in')) return true;
+  // Intentionally permissive: upstream filter disabled 2026-05-05 after
+  // Mother's Day regression. Relevance is handled downstream by
+  // isMilestoneEvent in the brief horizon loop.
   return false;
 }
 

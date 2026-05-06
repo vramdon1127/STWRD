@@ -1,10 +1,22 @@
 // STWRD Daily Digest — runs every morning at 6am CT via cron-job.org
-// Pulls tasks from Supabase, generates AI summary, sends via Resend
+// Pulls tasks from Supabase, generates AI summary, sends via Resend.
+//
+// For users whose id is in PERSONAL_BRIEFING_USER_IDS, ALSO pulls a
+// household briefing from the personal-life Supabase project (sensors +
+// sleep + iMessages + Gmail) and surfaces a household card in the email.
+// The personal briefing is never required — if it errors or times out,
+// the digest still ships without the household card.
 
 const SUPABASE_URL = 'https://fnnegalrrdzcgoelljmi.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZubmVnYWxycmR6Y2dvZWxsam1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5NDMwNjksImV4cCI6MjA5MTUxOTA2OX0.bhgk6czCQYTuUGnu5Zv7pml9uMuPrp4I1VBSzVIHwqw';
 
-// Use service role key to bypass RLS for server-side digest
+// Vijay's user_id — only user that gets the personal household briefing card
+// for now. Convert to a `profiles.personal_briefing_enabled` flag when
+// expanding to Mia / other beta users.
+const PERSONAL_BRIEFING_USER_IDS = new Set([
+  '2e5683e0-c6ad-483f-b31d-c93f097c0aeb',
+]);
+
 function getServiceKey() {
   return process.env.SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
 }
@@ -22,20 +34,42 @@ async function sbFetch(path, useServiceRole = false) {
   return text ? JSON.parse(text) : null;
 }
 
-// Friendly first-name salutation from a profile row.
-// Falls back to email local-part, then "friend", so the digest never crashes
-// on a partial profile.
+async function fetchPersonalBriefing() {
+  const url = process.env.PERSONAL_BRIEFING_URL;
+  const key = process.env.PERSONAL_BRIEFING_KEY;
+  if (!url || !key) return null;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(`${url}/functions/v1/morning-briefing`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      console.error('Personal briefing non-2xx:', res.status);
+      return null;
+    }
+    const data = await res.json();
+    return data && typeof data === 'object' ? data : null;
+  } catch (e) {
+    console.error('Personal briefing fetch failed:', e?.message || e);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function firstNameFrom(profile) {
   const raw = profile?.full_name || profile?.digest_email || '';
   const first = String(raw).trim().split(/\s+/)[0] || '';
-  // Strip the @domain tail if we fell back to the email.
   return first.split('@')[0] || 'friend';
 }
 
-// Resolve a project name → hex color for the email template.
-// CSS variables don't render in email clients, so we force hex: prefer the
-// user's stored per-project color (written during onboarding), fall back to
-// the built-in defaults for legacy project names, then to accent-purple.
 const LEGACY_PROJECT_HEX = {
   GNE: '#f472b6',
   Caliber: '#60a5fa',
@@ -50,13 +84,20 @@ function projectHexFor(name, colorByName) {
   return LEGACY_PROJECT_HEX[name] || '#7c6fef';
 }
 
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export default async function handler(req, res) {
-  // Allow manual trigger via POST (for testing), cron hits GET
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify cron secret to prevent unauthorized triggers
   const authHeader = req.headers['authorization'];
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
@@ -64,10 +105,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ── Pull all user profiles for digest sending ──────────────
-    // For now send to all users who have digest_email set
     const profiles = await sbFetch('profiles?digest_email=not.is.null&select=id,full_name,digest_email,anthropic_key', true);
-    
+
     if (!profiles || profiles.length === 0) {
       return res.status(200).json({ message: 'No users with digest email configured' });
     }
@@ -77,20 +116,33 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'RESEND_API_KEY not configured in environment' });
     }
 
+    let personalBriefing = null;
+    const needsBriefing = profiles.some(p => PERSONAL_BRIEFING_USER_IDS.has(p.id));
+    if (needsBriefing) {
+      personalBriefing = await fetchPersonalBriefing();
+    }
+
     let sent = 0;
     let errors = [];
 
-    // Send digest to each user
     for (const profile of profiles) {
       try {
-        await sendDigestToUser(profile, resendKey);
+        const briefingForUser = PERSONAL_BRIEFING_USER_IDS.has(profile.id)
+          ? personalBriefing
+          : null;
+        await sendDigestToUser(profile, resendKey, briefingForUser);
         sent++;
-      } catch(e) {
+      } catch (e) {
         errors.push({ user: profile.id, error: e.message });
       }
     }
 
-    return res.status(200).json({ success: true, sent, errors });
+    return res.status(200).json({
+      success: true,
+      sent,
+      errors,
+      personal_briefing_attached: !!personalBriefing,
+    });
 
   } catch (e) {
     console.error('Digest error:', e);
@@ -98,67 +150,58 @@ export default async function handler(req, res) {
   }
 }
 
-// Helper: send digest to a single user
-async function sendDigestToUser(profile, resendKey) {
-    const toEmail = profile.digest_email;
-    // Anthropic key: prefer per-user BYOK, fall back to env. Mirrors the
-    // /api/process resolution pattern so non-BYOK beta users still get digests.
-    const anthropicKey = profile.anthropic_key || process.env.ANTHROPIC_API_KEY;
-    const settingsMap = { digest_email: toEmail, anthropic_key: anthropicKey };
+async function sendDigestToUser(profile, resendKey, personalBriefing) {
+  const toEmail = profile.digest_email;
+  const anthropicKey = profile.anthropic_key || process.env.ANTHROPIC_API_KEY;
 
-    if (!toEmail || !anthropicKey || !resendKey) {
-      return res.status(400).json({
-        error: 'Missing Anthropic key (no BYOK on profile and no ANTHROPIC_API_KEY in env)',
-        missing: { toEmail: !toEmail, anthropicKey: !anthropicKey, resendKey: !resendKey }
-      });
-    }
+  if (!toEmail || !anthropicKey || !resendKey) {
+    throw new Error(
+      `Missing required config (toEmail=${!!toEmail}, anthropicKey=${!!anthropicKey}, resendKey=${!!resendKey})`
+    );
+  }
 
-    // ── Identity ────────────────────────────────────────────────
-    const firstName = firstNameFrom(profile);
+  const firstName = firstNameFrom(profile);
+  const userId = profile.id;
+  const tasks = await sbFetch(`tasks?user_id=eq.${userId}&status=neq.done&order=created_at.desc&limit=100`, true) || [];
 
-    // ── Pull active tasks ───────────────────────────────────────
-    const userId = profile.id;
-    const tasks = await sbFetch(`tasks?user_id=eq.${userId}&status=neq.done&order=created_at.desc&limit=100`, true) || [];
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  const todayDisplay = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Chicago'
+  });
 
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-    const todayDisplay = new Date().toLocaleDateString('en-US', {
-      weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Chicago'
-    });
+  const dueTodayTasks = tasks.filter(t => t.due_date === today);
+  const overdueTasks = tasks.filter(t => t.due_date && t.due_date < today);
+  const p1Tasks = tasks.filter(t => t.priority === 'P1');
+  const aiCompleteTasks = tasks.filter(t => t.category === 'AI Complete');
 
-    const dueTodayTasks = tasks.filter(t => t.due_date === today);
-    const overdueTasks = tasks.filter(t => t.due_date && t.due_date < today);
-    const p1Tasks = tasks.filter(t => t.priority === 'P1');
-    const aiCompleteTasks = tasks.filter(t => t.category === 'AI Complete');
+  const userProjectRows = await sbFetch(
+    `projects?user_id=eq.${userId}&order=sort_order.asc`,
+    true
+  ) || [];
+  const projectColorByName = {};
+  userProjectRows.forEach(p => { if (p?.name) projectColorByName[p.name] = p.color || null; });
 
-    // Per-user project color map, used for the project dots next to Due Today
-    // items. Matches what the in-app drilldowns render.
-    const userProjectRows = await sbFetch(
-      `projects?user_id=eq.${userId}&order=sort_order.asc`,
-      true
-    ) || [];
-    const projectColorByName = {};
-    userProjectRows.forEach(p => { if (p?.name) projectColorByName[p.name] = p.color || null; });
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoStr = weekAgo.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoStr = weekAgo.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  let completedThisWeek = [];
+  try {
+    completedThisWeek = await sbFetch(`tasks?user_id=eq.${userId}&status=eq.done&created_at=gte.${weekAgoStr}T00:00:00Z&limit=200`, true) || [];
+  } catch (e) {}
 
-    let completedThisWeek = [];
-    try {
-      completedThisWeek = await sbFetch(`tasks?user_id=eq.${userId}&status=eq.done&created_at=gte.${weekAgoStr}T00:00:00Z&limit=200`, true) || [];
-    } catch(e) {}
+  const totalThisWeek = tasks.length + completedThisWeek.length;
+  const completionRate = totalThisWeek > 0
+    ? Math.round((completedThisWeek.length / totalThisWeek) * 100)
+    : 0;
 
-    const totalThisWeek = tasks.length + completedThisWeek.length;
-    const completionRate = totalThisWeek > 0
-      ? Math.round((completedThisWeek.length / totalThisWeek) * 100)
-      : 0;
+  const taskSummary = tasks.slice(0, 30).map(t =>
+    `[${t.project}][${t.category}][${t.priority}]${t.due_date ? '[due:' + t.due_date + ']' : ''} ${t.cleaned_task || t.content}`
+  ).join('\n');
 
-    // ── Ask Claude for one sharp insight ───────────────────────
-    const taskSummary = tasks.slice(0, 30).map(t =>
-      `[${t.project}][${t.category}][${t.priority}]${t.due_date ? '[due:'+t.due_date+']' : ''} ${t.cleaned_task || t.content}`
-    ).join('\n');
+  const householdContext = buildHouseholdContextForAI(personalBriefing);
 
-    const aiPrompt = `You are STWRD, ${firstName}'s personal AI life manager. Generate a sharp, specific morning briefing.
+  const aiPrompt = `You are STWRD, ${firstName}'s personal AI life manager. Generate a sharp, specific morning briefing.
 
 TODAY: ${todayDisplay}
 COMPLETION RATE: ${completionRate}%
@@ -169,81 +212,80 @@ AI CAN HANDLE: ${aiCompleteTasks.length} tasks
 
 ACTIVE TASKS:
 ${taskSummary || 'No active tasks'}
-
-Give exactly ONE sharp, actionable focus recommendation for today. Be specific — name actual tasks. Be direct, warm, brief. Max 2 sentences.
+${householdContext ? `\nHOUSEHOLD CONTEXT (last 24h):\n${householdContext}\n` : ''}
+Give exactly ONE sharp, actionable focus recommendation for today. Be specific — name actual tasks. If household context surfaces something genuinely urgent (e.g. high radon, terrible sleep, an unread message from a high-priority contact), you may weave it in. Be direct, warm, brief. Max 2 sentences.
 
 FOCUS: [your recommendation here]`;
 
-    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', // fast + cheap for daily digest
-        max_tokens: 150,
-        messages: [{ role: 'user', content: aiPrompt }]
-      })
-    });
+  const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': anthropicKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      messages: [{ role: 'user', content: aiPrompt }]
+    })
+  });
 
-    const aiData = await aiRes.json();
-    const aiText = aiData.content?.[0]?.text || '';
-    const focusMatch = aiText.match(/FOCUS: (.+)/s);
-    const focusRaw = focusMatch ? focusMatch[1].trim() : aiText.trim();
-    const focusLine = focusRaw.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^FOCUS:\s*/i, '').trim();
+  const aiData = await aiRes.json();
+  const aiText = aiData.content?.[0]?.text || '';
+  const focusMatch = aiText.match(/FOCUS: (.+)/s);
+  const focusRaw = focusMatch ? focusMatch[1].trim() : aiText.trim();
+  const focusLine = focusRaw.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^FOCUS:\s*/i, '').trim();
 
-    // ── Build HTML email ────────────────────────────────────────
-    const dueTodayHtml = dueTodayTasks.length > 0
-      ? dueTodayTasks.slice(0, 5).map(t => {
-          const projColor = projectHexFor(t.project, projectColorByName);
-          return `<tr>
-            <td style="padding:5px 0;">
-              <span style="display:inline-block;width:8px;height:8px;background:${projColor};border-radius:50%;margin-right:8px;"></span>
-              <span style="font-size:13px;color:#f0f0ff;">${t.cleaned_task || t.content}</span>
-              <span style="font-size:11px;color:#8888aa;margin-left:6px;">${t.project}</span>
-            </td>
-          </tr>`;
-        }).join('') + (dueTodayTasks.length > 5 ? `<tr><td style="font-size:12px;color:#8888aa;padding:4px 0;">+${dueTodayTasks.length - 5} more</td></tr>` : '')
-      : '<tr><td style="font-size:13px;color:#8888aa;padding:8px 0;">Nothing due today 🎉</td></tr>';
+  const dueTodayHtml = dueTodayTasks.length > 0
+    ? dueTodayTasks.slice(0, 5).map(t => {
+        const projColor = projectHexFor(t.project, projectColorByName);
+        return `<tr>
+          <td style="padding:5px 0;">
+            <span style="display:inline-block;width:8px;height:8px;background:${projColor};border-radius:50%;margin-right:8px;"></span>
+            <span style="font-size:13px;color:#f0f0ff;">${esc(t.cleaned_task || t.content)}</span>
+            <span style="font-size:11px;color:#8888aa;margin-left:6px;">${esc(t.project || '')}</span>
+          </td>
+        </tr>`;
+      }).join('') + (dueTodayTasks.length > 5 ? `<tr><td style="font-size:12px;color:#8888aa;padding:4px 0;">+${dueTodayTasks.length - 5} more</td></tr>` : '')
+    : '<tr><td style="font-size:13px;color:#8888aa;padding:8px 0;">Nothing due today 🎉</td></tr>';
 
-    const overdueHtml = overdueTasks.length > 0
-      ? `<div style="background:#1a0f0f;border:1px solid #ef444440;border-radius:10px;padding:14px;margin-bottom:16px;">
-          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#ef4444;margin-bottom:8px;">⚠️ Overdue (${overdueTasks.length})</div>
-          ${overdueTasks.slice(0, 3).map(t => `<div style="font-size:13px;color:#f0f0ff;padding:3px 0;">${t.cleaned_task || t.content} <span style="color:#8888aa;">(${t.due_date})</span></div>`).join('')}
-          ${overdueTasks.length > 3 ? `<div style="font-size:12px;color:#8888aa;margin-top:4px;">+${overdueTasks.length - 3} more overdue</div>` : ''}
-        </div>` 
-      : '';
+  const overdueHtml = overdueTasks.length > 0
+    ? `<div style="background:#1a0f0f;border:1px solid #ef444440;border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#ef4444;margin-bottom:8px;">⚠️ Overdue (${overdueTasks.length})</div>
+        ${overdueTasks.slice(0, 3).map(t => `<div style="font-size:13px;color:#f0f0ff;padding:3px 0;">${esc(t.cleaned_task || t.content)} <span style="color:#8888aa;">(${esc(t.due_date)})</span></div>`).join('')}
+        ${overdueTasks.length > 3 ? `<div style="font-size:12px;color:#8888aa;margin-top:4px;">+${overdueTasks.length - 3} more overdue</div>` : ''}
+      </div>`
+    : '';
 
-    const html = `<!DOCTYPE html>
+  const householdHtml = renderHouseholdCard(personalBriefing);
+
+  const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <div style="max-width:560px;margin:0 auto;padding:24px 16px;">
 
-    <!-- HEADER -->
     <div style="margin-bottom:24px;">
       <div style="font-size:22px;font-weight:800;color:#7c6fef;letter-spacing:-0.5px;">STWRD</div>
       <div style="font-size:13px;color:#8888aa;margin-top:2px;">${todayDisplay}</div>
     </div>
 
-    <!-- AI FOCUS -->
     <div style="background:#12121a;border:1px solid #7c6fef40;border-radius:14px;padding:18px;margin-bottom:16px;position:relative;overflow:hidden;">
       <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#7c6fef,#f472b6,#10b981);"></div>
       <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#7c6fef;margin-bottom:8px;">🧠 Today's Focus</div>
-      <div style="font-size:14px;color:#f0f0ff;line-height:1.6;">${focusLine}</div>
+      <div style="font-size:14px;color:#f0f0ff;line-height:1.6;">${esc(focusLine)}</div>
     </div>
 
     ${overdueHtml}
 
-    <!-- DUE TODAY -->
     <div style="background:#12121a;border:1px solid #2a2a3d;border-radius:14px;padding:18px;margin-bottom:16px;">
       <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8888aa;margin-bottom:10px;">Due Today (${dueTodayTasks.length})</div>
       <table style="width:100%;border-collapse:collapse;">${dueTodayHtml}</table>
     </div>
 
-    <!-- QUICK STATS -->
+    ${householdHtml}
+
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
       <div style="background:#12121a;border:1px solid #2a2a3d;border-radius:10px;padding:12px;text-align:center;">
         <div style="font-size:22px;font-weight:800;color:#7c6fef;">${tasks.length}</div>
@@ -259,12 +301,10 @@ FOCUS: [your recommendation here]`;
       </div>
     </div>
 
-    <!-- CTA -->
     <div style="text-align:center;margin-bottom:24px;">
       <a href="https://getstwrd.com" style="display:inline-block;background:linear-gradient(135deg,#7c6fef,#8b5cf6);color:white;text-decoration:none;padding:14px 32px;border-radius:12px;font-size:14px;font-weight:700;letter-spacing:0.5px;">Open STWRD →</a>
     </div>
 
-    <!-- FOOTER -->
     <div style="text-align:center;font-size:11px;color:#8888aa;">
       STWRD · Your Household OS · <a href="https://getstwrd.com" style="color:#7c6fef;text-decoration:none;">Open app</a>
     </div>
@@ -273,27 +313,173 @@ FOCUS: [your recommendation here]`;
 </body>
 </html>`;
 
-    // ── Send via Resend ─────────────────────────────────────────
-    const emailRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${resendKey}`
-      },
-      body: JSON.stringify({
-        from: 'STWRD <onboarding@resend.dev>',
-        to: [toEmail],
-        subject: `STWRD · ${todayDisplay}`,
-        html
-      })
-    });
+  const emailRes = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${resendKey}`
+    },
+    body: JSON.stringify({
+      from: 'STWRD <onboarding@resend.dev>',
+      to: [toEmail],
+      subject: `STWRD · ${todayDisplay}`,
+      html
+    })
+  });
 
-    const emailData = await emailRes.json();
+  const emailData = await emailRes.json();
 
-    if (!emailRes.ok) {
-      console.error('Resend error:', emailData);
-      return res.status(500).json({ error: 'Email send failed', details: emailData });
+  if (!emailRes.ok) {
+    console.error('Resend error:', emailData);
+    throw new Error(`Email send failed: ${JSON.stringify(emailData)}`);
+  }
+}
+
+function buildHouseholdContextForAI(briefing) {
+  if (!briefing) return '';
+  const lines = [];
+
+  const air = briefing.air;
+  if (air && air.reading_count) {
+    if (air.co2?.current != null) lines.push(`CO2 ${air.co2.current} ppm`);
+    if (air.humidity?.current != null) lines.push(`humidity ${air.humidity.current}%`);
+    if (air.radon_bq_m3?.current != null) lines.push(`radon ${air.radon_bq_m3.current} Bq/m³`);
+    if (air.pm25?.current != null) lines.push(`PM2.5 ${air.pm25.current}`);
+    if (Array.isArray(air.anomalies) && air.anomalies.length) {
+      lines.push(`air anomalies: ${air.anomalies.join('; ')}`);
     }
+  }
 
-    // digest sent successfully for this user
+  const sleep = briefing.sleep;
+  if (sleep) {
+    if (sleep.score != null) lines.push(`sleep score ${sleep.score}`);
+    if (sleep.readiness != null) lines.push(`readiness ${sleep.readiness}`);
+    if (sleep.total_hours != null) lines.push(`total sleep ${sleep.total_hours}h`);
+  }
+
+  const im = briefing.imessages;
+  if (im && Array.isArray(im.urgent) && im.urgent.length) {
+    lines.push(`urgent imessages: ${im.urgent.length}`);
+    im.urgent.slice(0, 3).forEach(m => {
+      const who = m.resolved_name || m.sender || 'unknown';
+      const snippet = (m.text || '').slice(0, 80).replace(/\s+/g, ' ');
+      lines.push(`  - ${who}: ${snippet}`);
+    });
+  }
+
+  const gm = briefing.gmail;
+  if (gm && Array.isArray(gm.urgent) && gm.urgent.length) {
+    lines.push(`urgent gmail: ${gm.urgent.length}`);
+    gm.urgent.slice(0, 3).forEach(m => {
+      const subj = (m.subject || m.snippet || '').slice(0, 80).replace(/\s+/g, ' ');
+      lines.push(`  - ${subj}`);
+    });
+  }
+
+  const hh = briefing.household;
+  if (hh?.pregnancy_week != null) {
+    lines.push(`pregnancy week ${hh.pregnancy_week}, ${hh.weeks_until_due ?? '?'} weeks until due`);
+  }
+
+  return lines.join('\n');
+}
+
+function renderHouseholdCard(briefing) {
+  if (!briefing) return '';
+
+  const sections = [];
+
+  const air = briefing.air;
+  if (air && air.reading_count) {
+    const stats = [];
+    if (air.co2?.current != null) stats.push(`CO₂ <strong style="color:#f0f0ff;">${air.co2.current}</strong>`);
+    if (air.humidity?.current != null) stats.push(`Humidity <strong style="color:#f0f0ff;">${air.humidity.current}%</strong>`);
+    if (air.temp_c?.current != null) stats.push(`Temp <strong style="color:#f0f0ff;">${air.temp_c.current}°C</strong>`);
+    if (air.radon_bq_m3?.current != null) stats.push(`Radon <strong style="color:#f0f0ff;">${air.radon_bq_m3.current}</strong>`);
+    const anomalies = Array.isArray(air.anomalies) && air.anomalies.length
+      ? `<div style="font-size:11px;color:#fbbf24;margin-top:6px;">⚠ ${esc(air.anomalies.join(' · '))}</div>`
+      : '';
+    if (stats.length) {
+      sections.push(`
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8888aa;margin-bottom:6px;">Air</div>
+          <div style="font-size:12px;color:#aaaac8;line-height:1.5;">${stats.join(' · ')}</div>
+          ${anomalies}
+        </div>
+      `);
+    }
+  }
+
+  const sleep = briefing.sleep;
+  if (sleep && (sleep.score != null || sleep.readiness != null || sleep.total_hours != null)) {
+    const bits = [];
+    if (sleep.score != null) bits.push(`Sleep <strong style="color:#f0f0ff;">${sleep.score}</strong>`);
+    if (sleep.readiness != null) bits.push(`Readiness <strong style="color:#f0f0ff;">${sleep.readiness}</strong>`);
+    if (sleep.total_hours != null) bits.push(`<strong style="color:#f0f0ff;">${sleep.total_hours}h</strong> in bed`);
+    sections.push(`
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8888aa;margin-bottom:6px;">Recovery</div>
+        <div style="font-size:12px;color:#aaaac8;line-height:1.5;">${bits.join(' · ')}</div>
+      </div>
+    `);
+  }
+
+  const im = briefing.imessages;
+  const urgentIm = Array.isArray(im?.urgent) ? im.urgent : [];
+  if (urgentIm.length) {
+    const rows = urgentIm.slice(0, 4).map(m => {
+      const who = esc(m.resolved_name || m.sender || 'Unknown');
+      const text = esc((m.text || '').slice(0, 120));
+      return `<div style="font-size:12px;color:#f0f0ff;padding:4px 0;border-bottom:1px solid #1f1f2d;">
+        <span style="color:#7c6fef;font-weight:600;">${who}</span>
+        <span style="color:#aaaac8;"> · ${text}</span>
+      </div>`;
+    }).join('');
+    const more = urgentIm.length > 4
+      ? `<div style="font-size:11px;color:#8888aa;margin-top:6px;">+${urgentIm.length - 4} more</div>`
+      : '';
+    sections.push(`
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8888aa;margin-bottom:6px;">📱 Texts That Need You</div>
+        ${rows}
+        ${more}
+      </div>
+    `);
+  }
+
+  const gm = briefing.gmail;
+  const urgentGm = Array.isArray(gm?.urgent) ? gm.urgent : [];
+  if (urgentGm.length) {
+    const rows = urgentGm.slice(0, 4).map(m => {
+      const subj = esc((m.subject || '(no subject)').slice(0, 100));
+      const from = esc(m.from || m.account || '');
+      return `<div style="font-size:12px;color:#f0f0ff;padding:4px 0;border-bottom:1px solid #1f1f2d;">
+        <span style="color:#7c6fef;font-weight:600;">${subj}</span>
+        ${from ? `<span style="color:#8888aa;font-size:11px;display:block;margin-top:1px;">${from}</span>` : ''}
+      </div>`;
+    }).join('');
+    const more = urgentGm.length > 4
+      ? `<div style="font-size:11px;color:#8888aa;margin-top:6px;">+${urgentGm.length - 4} more</div>`
+      : '';
+    sections.push(`
+      <div style="margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8888aa;margin-bottom:6px;">✉️ Email Worth Reading</div>
+        ${rows}
+        ${more}
+      </div>
+    `);
+  }
+
+  if (Array.isArray(briefing.errors) && briefing.errors.length) {
+    console.error('morning-briefing partial errors:', briefing.errors);
+  }
+
+  if (!sections.length) return '';
+
+  return `
+    <div style="background:#12121a;border:1px solid #2a2a3d;border-radius:14px;padding:18px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#10b981;margin-bottom:12px;">🏠 Household</div>
+      ${sections.join('')}
+    </div>
+  `;
 }

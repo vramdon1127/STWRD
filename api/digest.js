@@ -120,6 +120,9 @@ export default async function handler(req, res) {
     const needsBriefing = profiles.some(p => PERSONAL_BRIEFING_USER_IDS.has(p.id));
     if (needsBriefing) {
       personalBriefing = await fetchPersonalBriefing();
+      if (personalBriefing) {
+        personalBriefing.triage = await triageInbox(personalBriefing);
+      }
     }
 
     let sent = 0;
@@ -357,22 +360,18 @@ function buildHouseholdContextForAI(briefing) {
     if (sleep.total_hours != null) lines.push(`total sleep ${sleep.total_hours}h`);
   }
 
-  const im = briefing.imessages;
-  if (im && Array.isArray(im.urgent) && im.urgent.length) {
-    lines.push(`urgent imessages: ${im.urgent.length}`);
-    im.urgent.slice(0, 3).forEach(m => {
-      const who = m.resolved_name || m.sender || 'unknown';
-      const snippet = (m.text || '').slice(0, 80).replace(/\s+/g, ' ');
-      lines.push(`  - ${who}: ${snippet}`);
+  const triageTexts = briefing.triage?.texts || [];
+  const triageEmails = briefing.triage?.emails || [];
+  if (triageTexts.length) {
+    lines.push('TOP TEXTS NEEDING ATTENTION:');
+    triageTexts.slice(0, 2).forEach(t => {
+      lines.push(`- ${t.from}: ${t.what} (${t.why})`);
     });
   }
-
-  const gm = briefing.gmail;
-  if (gm && Array.isArray(gm.urgent) && gm.urgent.length) {
-    lines.push(`urgent gmail: ${gm.urgent.length}`);
-    gm.urgent.slice(0, 3).forEach(m => {
-      const subj = (m.subject || m.snippet || '').slice(0, 80).replace(/\s+/g, ' ');
-      lines.push(`  - ${subj}`);
+  if (triageEmails.length) {
+    lines.push('TOP EMAILS WORTH READING:');
+    triageEmails.slice(0, 2).forEach(e => {
+      lines.push(`- ${e.from} re: ${e.subject} — ${e.why}`);
     });
   }
 
@@ -382,6 +381,111 @@ function buildHouseholdContextForAI(briefing) {
   }
 
   return lines.join('\n');
+}
+
+async function triageInbox(briefing) {
+  const rawTexts = briefing?.imessages?.threads || briefing?.imessages?.urgent || [];
+  const rawAccounts = briefing?.gmail?.accounts
+    || (briefing?.gmail?.urgent ? [{ threads: briefing.gmail.urgent }] : []);
+
+  if (!rawTexts.length && !rawAccounts.length) {
+    return { texts: [], emails: [] };
+  }
+
+  const textsForClaude = rawTexts.map(t => ({
+    from: t.resolved_name || t.sender,
+    relationship: t.relationship,
+    last_message_at: t.last_at,
+    messages: t.messages
+      ? t.messages.slice(-3).map(m => m.text)
+      : (t.text ? [t.text] : []),
+  }));
+
+  const emailsForClaude = [];
+  for (const acct of rawAccounts) {
+    for (const th of (acct.threads || [])) {
+      emailsForClaude.push({
+        account: acct.context || acct.account,
+        from: th.from_name || th.from_address || th.from,
+        from_address: th.from_address,
+        subject: th.subject,
+        snippet: (th.snippet || '').slice(0, 300),
+        unread: th.unread,
+        received_at: th.received_at,
+      });
+    }
+  }
+
+  const systemPrompt = `You are triaging Vijay's inbox for his daily morning digest. You know his life:
+
+- Partner: Mia (currently 27 weeks pregnant, due July 31). Anything from Mia defaults to surfacing — even casual messages.
+- Businesses:
+  - GNE (Good News Entertainment) — DJ/MC business. Bark leads, Wedding Wire inquiries, HoneyBook notifications, VIBO events, direct couple inquiries are time-sensitive money.
+  - Caliber — Director of Internal Controls. Colleagues by name: Craig, Grant Willard, Joel Odelson, Tom Springfield, Amit Patel, Brian Telthorst.
+  - ServeAnts LLC / STWRD / Knot — his side projects.
+- Family / pregnancy: anything medical, OB-related, family logistics around the baby = top priority.
+
+Surface only items that genuinely need attention today. Skip:
+- Marketing and promotional email (Temu, deals, newsletters)
+- "Your package shipped" / no-reply automated notifications
+- Social pleasantries that don't need a response
+- Anything that can wait a week with zero consequence
+
+Order matters — the most important item is first in each list. Order IS the priority signal. Do not include numeric scores or priority labels.
+
+For "why": one sentence. Not a summary of the message — the REASON it earned attention. Examples:
+- "she already picked Hat Creek, just confirm to the group"
+- "10 fresh GNE leads, these decay in hours"
+- "Taylor is following up a second time on a meeting that was supposed to close last week"
+
+Return ONLY valid JSON, no preamble, no markdown fences:
+{
+  "texts": [{ "from": "...", "what": "...", "why": "..." }],
+  "emails": [{ "from": "...", "subject": "...", "why": "..." }]
+}
+
+If nothing in a category warrants surfacing, return an empty array for that category. Empty arrays are fine and expected — quiet morning is real signal.`;
+
+  const userPrompt = `INBOUND TEXTS (last 24h):
+${JSON.stringify(textsForClaude, null, 2)}
+
+UNREAD/RECENT EMAILS (last 24h, after noise filtering):
+${JSON.stringify(emailsForClaude, null, 2)}
+
+Triage. Return JSON only.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+
+    if (!resp.ok) {
+      console.error('triageInbox: Claude API non-OK', resp.status);
+      return { texts: [], emails: [] };
+    }
+    const data = await resp.json();
+    const text = data?.content?.[0]?.text || '';
+    const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return {
+      texts: Array.isArray(parsed.texts) ? parsed.texts : [],
+      emails: Array.isArray(parsed.emails) ? parsed.emails : [],
+    };
+  } catch (err) {
+    console.error('triageInbox failed:', err.message);
+    return { texts: [], emails: [] };
+  }
 }
 
 function renderHouseholdCard(briefing) {
@@ -424,19 +528,19 @@ function renderHouseholdCard(briefing) {
     `);
   }
 
-  const im = briefing.imessages;
-  const urgentIm = Array.isArray(im?.urgent) ? im.urgent : [];
-  if (urgentIm.length) {
-    const rows = urgentIm.slice(0, 4).map(m => {
-      const who = esc(m.resolved_name || m.sender || 'Unknown');
-      const text = esc((m.text || '').slice(0, 120));
-      return `<div style="font-size:12px;color:#f0f0ff;padding:4px 0;border-bottom:1px solid #1f1f2d;">
-        <span style="color:#7c6fef;font-weight:600;">${who}</span>
-        <span style="color:#aaaac8;"> · ${text}</span>
+  const triageTexts = briefing.triage?.texts || [];
+  if (triageTexts.length) {
+    const rows = triageTexts.slice(0, 4).map(t => {
+      const from = esc(t.from || 'Unknown');
+      const what = esc((t.what || '').slice(0, 140));
+      const why = esc((t.why || '').slice(0, 140));
+      return `<div style="font-size:12px;color:#f0f0ff;padding:6px 0;border-bottom:1px solid #1f1f2d;">
+        <div><span style="color:#7c6fef;font-weight:600;">${from}</span><span style="color:#aaaac8;"> · ${what}</span></div>
+        ${why ? `<div style="color:#8888aa;font-size:11px;font-style:italic;margin-top:2px;">${why}</div>` : ''}
       </div>`;
     }).join('');
-    const more = urgentIm.length > 4
-      ? `<div style="font-size:11px;color:#8888aa;margin-top:6px;">+${urgentIm.length - 4} more</div>`
+    const more = triageTexts.length > 4
+      ? `<div style="font-size:11px;color:#8888aa;margin-top:6px;">+${triageTexts.length - 4} more</div>`
       : '';
     sections.push(`
       <div style="margin-bottom:10px;">
@@ -447,19 +551,20 @@ function renderHouseholdCard(briefing) {
     `);
   }
 
-  const gm = briefing.gmail;
-  const urgentGm = Array.isArray(gm?.urgent) ? gm.urgent : [];
-  if (urgentGm.length) {
-    const rows = urgentGm.slice(0, 4).map(m => {
-      const subj = esc((m.subject || '(no subject)').slice(0, 100));
-      const from = esc(m.from || m.account || '');
-      return `<div style="font-size:12px;color:#f0f0ff;padding:4px 0;border-bottom:1px solid #1f1f2d;">
-        <span style="color:#7c6fef;font-weight:600;">${subj}</span>
-        ${from ? `<span style="color:#8888aa;font-size:11px;display:block;margin-top:1px;">${from}</span>` : ''}
+  const triageEmails = briefing.triage?.emails || [];
+  if (triageEmails.length) {
+    const rows = triageEmails.slice(0, 4).map(e => {
+      const from = esc(e.from || '');
+      const subject = esc((e.subject || '(no subject)').slice(0, 100));
+      const why = esc((e.why || '').slice(0, 140));
+      return `<div style="font-size:12px;color:#f0f0ff;padding:6px 0;border-bottom:1px solid #1f1f2d;">
+        <div><span style="color:#7c6fef;font-weight:600;">${subject}</span></div>
+        ${from ? `<div style="color:#aaaac8;font-size:11px;margin-top:1px;">${from}</div>` : ''}
+        ${why ? `<div style="color:#8888aa;font-size:11px;font-style:italic;margin-top:2px;">${why}</div>` : ''}
       </div>`;
     }).join('');
-    const more = urgentGm.length > 4
-      ? `<div style="font-size:11px;color:#8888aa;margin-top:6px;">+${urgentGm.length - 4} more</div>`
+    const more = triageEmails.length > 4
+      ? `<div style="font-size:11px;color:#8888aa;margin-top:6px;">+${triageEmails.length - 4} more</div>`
       : '';
     sections.push(`
       <div style="margin-bottom:4px;">

@@ -8,164 +8,56 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #F7F5F0;
-    --surface: #FFFFFF;
-    --surface2: #F0EDE8;
-    --border: rgba(0,0,0,0.08);
-    --border2: rgba(0,0,0,0.14);
-    --text: #1A1816;
-    --text2: #6B6560;
-    --text3: #A09890;
-    --green: #2D6A4F;
-    --green-bg: #EAF3EE;
-    --amber: #92400E;
-    --amber-bg: #FEF3C7;
-    --red: #991B1B;
-    --red-bg: #FEE2E2;
-    --accent: #C8956C;
-    --radius: 16px;
-    --radius-sm: 10px;
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface2: #F0EDE8;
+    --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.14);
+    --text: #1A1816; --text2: #6B6560; --text3: #A09890;
+    --green: #2D6A4F; --green-bg: #EAF3EE;
+    --amber: #92400E; --amber-bg: #FEF3C7;
+    --red: #991B1B; --red-bg: #FEE2E2;
+    --accent: #C8956C; --radius: 16px; --radius-sm: 10px;
   }
-
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #111110;
-      --surface: #1C1B1A;
-      --surface2: #252422;
-      --border: rgba(255,255,255,0.08);
-      --border2: rgba(255,255,255,0.14);
-      --text: #F2EFE9;
-      --text2: #9E9890;
-      --text3: #6B6560;
-      --green: #6EE7B7;
-      --green-bg: #0D2E20;
-      --amber: #FCD34D;
-      --amber-bg: #2D1F06;
-      --red: #FCA5A5;
-      --red-bg: #2D0A0A;
-      --accent: #D4A574;
+      --bg: #111110; --surface: #1C1B1A; --surface2: #252422;
+      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+      --text: #F2EFE9; --text2: #9E9890; --text3: #6B6560;
+      --green: #6EE7B7; --green-bg: #0D2E20;
+      --amber: #FCD34D; --amber-bg: #2D1F06;
+      --red: #FCA5A5; --red-bg: #2D0A0A; --accent: #D4A574;
     }
   }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 400;
-    min-height: 100vh;
-    padding: 0;
-  }
-
-  .header {
-    padding: 2rem 1.5rem 1rem;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .header-left { display: flex; align-items: baseline; gap: 10px; }
-
-  .logo {
-    font-family: 'DM Serif Display', serif;
-    font-size: 22px;
-    color: var(--text);
-    letter-spacing: -0.02em;
-  }
-
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 400; min-height: 100vh; }
+  .header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); letter-spacing: -0.02em; }
   .logo span { color: var(--accent); font-style: italic; }
-
-  .header-time {
-    font-size: 12px;
-    color: var(--text3);
-    letter-spacing: 0.02em;
-  }
-
-  .refresh-btn {
-    background: none;
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    color: var(--text2);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px;
-    padding: 6px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
+  .header-time { font-size: 12px; color: var(--text3); }
+  .refresh-btn { background: none; border: 1px solid var(--border2); border-radius: 8px; color: var(--text2); font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 6px 12px; cursor: pointer; transition: all 0.15s; }
   .refresh-btn:hover { background: var(--surface2); color: var(--text); }
-  .refresh-btn.spinning { opacity: 0.5; pointer-events: none; }
-
+  .refresh-btn:disabled { opacity: 0.4; cursor: default; }
   .main { padding: 1.5rem; max-width: 680px; margin: 0 auto; }
-
-  .section-label {
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text3);
-    margin: 2rem 0 0.875rem;
-  }
+  .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin: 2rem 0 0.875rem; }
   .section-label:first-child { margin-top: 0; }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    margin-bottom: 0;
-  }
-
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
   .preg-card { display: flex; align-items: center; gap: 1.25rem; }
-  .preg-ring {
-    width: 64px; height: 64px; border-radius: 50%;
-    border: 2.5px solid var(--accent);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    position: relative;
-  }
+  .preg-ring { width: 64px; height: 64px; border-radius: 50%; border: 2.5px solid var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .preg-week { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); }
-  .preg-info {}
   .preg-name { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
   .preg-detail { font-size: 13px; color: var(--text2); line-height: 1.5; }
   .preg-due { color: var(--accent); font-weight: 500; }
-
   .room-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-  .room-name { font-size: 14px; font-weight: 500; color: var(--text); }
-  .badge {
-    font-size: 11px; font-weight: 500;
-    padding: 3px 10px; border-radius: 20px;
-  }
+  .room-name { font-size: 14px; font-weight: 500; }
+  .badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; }
   .badge-good { background: var(--green-bg); color: var(--green); }
   .badge-warn { background: var(--amber-bg); color: var(--amber); }
   .badge-bad { background: var(--red-bg); color: var(--red); }
-
   .metrics-grid { display: grid; gap: 8px; }
   .g4 { grid-template-columns: repeat(4, 1fr); }
   .g3 { grid-template-columns: repeat(3, 1fr); }
   .g2 { grid-template-columns: repeat(2, 1fr); }
-
-  @media (max-width: 480px) {
-    .g4 { grid-template-columns: repeat(2, 1fr); }
-    .g3 { grid-template-columns: repeat(3, 1fr); }
-  }
-
-  .metric {
-    background: var(--surface2);
-    border-radius: var(--radius-sm);
-    padding: 0.875rem 1rem;
-  }
-  .metric-label {
-    font-size: 10px; font-weight: 500;
-    letter-spacing: 0.05em; text-transform: uppercase;
-    color: var(--text3); margin-bottom: 6px;
-    display: flex; align-items: center; gap: 5px;
-  }
+  @media (max-width: 480px) { .g4 { grid-template-columns: repeat(2, 1fr); } }
+  .metric { background: var(--surface2); border-radius: var(--radius-sm); padding: 0.875rem 1rem; }
+  .metric-label { font-size: 10px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
   .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
   .dot-good { background: var(--green); }
   .dot-warn { background: var(--amber); }
@@ -173,279 +65,314 @@
   .metric-value { font-size: 20px; font-weight: 300; color: var(--text); line-height: 1; }
   .metric-unit { font-size: 12px; color: var(--text2); }
   .metric-sub { font-size: 11px; color: var(--text3); margin-top: 5px; }
-
-  .dehumid-row {
-    display: flex; align-items: center; gap: 8px;
-    margin-top: 12px; padding-top: 12px;
-    border-top: 1px solid var(--border);
-  }
+  .dehumid-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
   .dehumid-label { font-size: 12px; color: var(--text3); }
-  .pill {
-    font-size: 11px; font-weight: 500;
-    padding: 3px 10px; border-radius: 20px;
-  }
+  .pill { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; }
   .pill-on { background: var(--green-bg); color: var(--green); }
   .pill-off { background: var(--surface2); color: var(--text3); }
-
-  .score-bar-track {
-    height: 3px; background: var(--border);
-    border-radius: 2px; margin-top: 8px; overflow: hidden;
-  }
-  .score-bar-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
-
-  .msg-list {}
-  .msg-item {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-  }
+  .score-bar-track { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 2px; }
+  .msg-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
   .msg-item:last-child { border-bottom: none; }
   .msg-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-  .msg-sender { font-size: 13px; font-weight: 500; color: var(--text); }
+  .msg-sender { font-size: 13px; font-weight: 500; }
   .msg-time { font-size: 11px; color: var(--text3); }
   .msg-text { font-size: 13px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  .nest-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  @media (max-width: 400px) { .nest-grid { grid-template-columns: repeat(2, 1fr); } }
-
-  .loading-state {
-    display: flex; align-items: center; justify-content: center;
-    padding: 3rem; color: var(--text3); font-size: 14px;
-    gap: 10px;
-  }
-  .spinner {
-    width: 16px; height: 16px;
-    border: 2px solid var(--border2);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
   .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; }
   @keyframes fadeIn { to { opacity: 1; } }
-
-  .stagger-1 { animation-delay: 0.05s; }
-  .stagger-2 { animation-delay: 0.1s; }
-  .stagger-3 { animation-delay: 0.15s; }
-  .stagger-4 { animation-delay: 0.2s; }
-  .stagger-5 { animation-delay: 0.25s; }
-  .stagger-6 { animation-delay: 0.3s; }
-
-  .last-updated {
-    text-align: center;
-    font-size: 11px;
-    color: var(--text3);
-    padding: 2rem 0 1rem;
-  }
+  .stagger-1{animation-delay:.05s} .stagger-2{animation-delay:.1s} .stagger-3{animation-delay:.15s}
+  .stagger-4{animation-delay:.2s} .stagger-5{animation-delay:.25s} .stagger-6{animation-delay:.3s} .stagger-7{animation-delay:.35s}
+  .last-updated { text-align: center; font-size: 11px; color: var(--text3); padding: 2rem 0 1rem; }
+  .brief-btn { width: 100%; background: var(--accent); border: none; border-radius: var(--radius-sm); color: white; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; padding: 12px; cursor: pointer; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .brief-btn:hover { opacity: 0.9; }
+  .brief-btn:disabled { opacity: 0.5; cursor: default; }
+  .brief-section { margin-top: 1.25rem; }
+  .brief-section-title { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  .brief-text { font-size: 14px; color: var(--text2); line-height: 1.7; }
+  .brief-loading { display: flex; align-items: center; gap: 10px; color: var(--text3); font-size: 13px; padding: 1rem 0; }
+  .brief-error { font-size: 13px; color: var(--red); padding: 0.5rem 0; }
+  .brief-ts { font-size: 11px; color: var(--text3); margin-top: 12px; }
 </style>
 </head>
 <body>
-
 <div class="header">
-  <div class="header-left">
-    <div class="logo">STWRD <span>Life</span></div>
-  </div>
+  <div class="logo">STWRD <span>Life</span></div>
   <div style="display:flex;align-items:center;gap:12px">
     <span class="header-time" id="header-time"></span>
     <button class="refresh-btn" id="refresh-btn" onclick="loadData()">Refresh</button>
   </div>
 </div>
-
 <div class="main" id="main">
-  <div class="loading-state"><div class="spinner"></div>Loading...</div>
+  <div style="display:flex;align-items:center;justify-content:center;padding:3rem;color:var(--text3);gap:10px">
+    <div class="spinner"></div> Loading...
+  </div>
 </div>
-
 <script>
 const API = 'https://hrwgmqjqtoabttqvurkq.supabase.co/functions/v1/dashboard-data';
+const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+let dashboardData = null;
 
-document.getElementById('header-time').textContent = new Date().toLocaleString('en-US',{
-  weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'
-});
+document.getElementById('header-time').textContent = new Date().toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 
-function sc(metric, val) {
-  if (metric === 'co2') return val < 800 ? 'good' : val < 1000 ? 'warn' : 'bad';
-  if (metric === 'hum') return val < 60 ? 'good' : val < 70 ? 'warn' : 'bad';
-  if (metric === 'pm25') return val < 12 ? 'good' : val < 35 ? 'warn' : 'bad';
-  if (metric === 'voc') return val < 100 ? 'good' : val < 200 ? 'warn' : 'bad';
+function sc(m,v){
+  if(m==='co2') return v<800?'good':v<1000?'warn':'bad';
+  if(m==='hum') return v<60?'good':v<70?'warn':'bad';
+  if(m==='pm25') return v<12?'good':v<35?'warn':'bad';
+  if(m==='voc') return v<100?'good':v<200?'warn':'bad';
   return 'good';
 }
 
-function metric(label, val, unit, metricKey, sub) {
-  const v = val != null ? (Number.isInteger(val) ? val : parseFloat(val).toFixed(1)) : '--';
-  const s = val != null ? sc(metricKey, parseFloat(val)) : 'good';
+function met(label,val,unit,mk,sub){
+  const v=val!=null?parseFloat(val).toFixed(Number.isInteger(parseFloat(val))?0:1):'--';
+  const s=val!=null?sc(mk,parseFloat(val)):'good';
   return `<div class="metric">
     <div class="metric-label"><span class="dot dot-${s}"></span>${label}</div>
     <div class="metric-value">${v}<span class="metric-unit"> ${unit}</span></div>
-    ${sub ? `<div class="metric-sub">${sub}</div>` : ''}
+    ${sub?`<div class="metric-sub">${sub}</div>`:''}
   </div>`;
 }
 
-function bar(val, max, color) {
-  const pct = Math.min(100, Math.round((val / max) * 100));
-  return `<div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
+function bar(val,max,color){
+  return `<div class="score-bar-track"><div class="score-bar-fill" style="width:${Math.min(100,Math.round(val/max*100))}%;background:${color}"></div></div>`;
 }
 
-function render(d) {
-  const ctx = {};
-  if (d.household) d.household.forEach(r => { ctx[r.key] = r.value; });
+function render(d){
+  dashboardData=d;
+  const ctx={};
+  if(d.household) d.household.forEach(r=>{ctx[r.key]=r.value;});
+  const due=new Date(ctx.mia_due_date||'2026-07-31');
+  const wLeft=Math.round((due-new Date())/(7*24*3600*1000));
+  const wPreg=40-wLeft;
+  const air=d.air||[];
+  const master=air.find(r=>r.device_id==='2960187261'||r.device_id==='master')||air[0];
+  const selah=air.find(r=>r.device_id==='selah-room'||r.device_id==='2920026883');
+  const nest=d.nest;
+  const readiness=d.readiness;
+  const sleep=d.sleep;
+  const msgs=d.messages||[];
+  const def=d.dehumidifier&&d.dehumidifier.length>0?d.dehumidifier[0]:null;
+  let html='';
 
-  const due = new Date(ctx.mia_due_date || '2026-07-31');
-  const now = new Date();
-  const wLeft = Math.round((due - now) / (7 * 24 * 3600 * 1000));
-  const wPreg = 40 - wLeft;
-  const dueStr = due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  html+=`<div class="section-label fade-in stagger-1">Household</div>
+  <div class="card fade-in stagger-1"><div class="preg-card">
+    <div class="preg-ring"><span class="preg-week">${wPreg}</span></div>
+    <div><div class="preg-name">Mia &mdash; week ${wPreg}</div>
+    <div class="preg-detail">${wLeft} weeks until <span class="preg-due">${due.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</span></div></div>
+  </div></div>`;
 
-  const air = d.air || [];
-  const master = air.find(r => r.device_id === '2960187261' || r.device_id === 'master') || air[0];
-  const selah = air.find(r => r.device_id === 'selah-room' || r.device_id === '2920026883');
-  const nest = d.nest;
-  const readiness = d.readiness;
-  const sleep = d.sleep;
-  const msgs = d.messages || [];
-  const def = d.dehumidifier && d.dehumidifier.length > 0 ? d.dehumidifier[0] : null;
-
-  let html = '';
-
-  // Pregnancy
-  html += `<div class="section-label fade-in stagger-1">Household</div>
-  <div class="card fade-in stagger-1">
-    <div class="preg-card">
-      <div class="preg-ring"><span class="preg-week">${wPreg}</span></div>
-      <div class="preg-info">
-        <div class="preg-name">Mia &mdash; week ${wPreg}</div>
-        <div class="preg-detail">${wLeft} weeks until <span class="preg-due">${dueStr}</span></div>
-      </div>
-    </div>
-  </div>`;
-
-  // Master bedroom
-  if (master) {
-    const hum = master.humidity_pct || master.humidity;
-    const hs = sc('hum', hum);
-    const tempF = master.temperature_c ? (master.temperature_c * 9/5 + 32) : null;
-    html += `<div class="section-label fade-in stagger-2">Air quality &mdash; master bedroom</div>
+  if(master){
+    const hum=master.humidity_pct||master.humidity;
+    const tf=master.temperature_c?(master.temperature_c*9/5+32):null;
+    html+=`<div class="section-label fade-in stagger-2">Air quality &mdash; master bedroom</div>
     <div class="card fade-in stagger-2">
-      <div class="room-header">
-        <span class="room-name">Master bedroom</span>
-        <span class="badge badge-${hs}">${Math.round(hum || 0)}% humidity</span>
-      </div>
+      <div class="room-header"><span class="room-name">Master bedroom</span>
+        <span class="badge badge-${sc('hum',hum)}">${Math.round(hum||0)}% humidity</span></div>
       <div class="metrics-grid g4">
-        ${metric('CO₂', master.co2_ppm || master.co2, 'ppm', 'co2')}
-        ${metric('Humidity', hum, '%', 'hum')}
-        ${metric('PM2.5', master.pm25_ugm3 || master.pm25, 'µg/m³', 'pm25')}
-        ${metric('Temp', tempF, '°F', 'temp')}
+        ${met('CO&#8322;',master.co2_ppm||master.co2,'ppm','co2')}
+        ${met('Humidity',hum,'%','hum')}
+        ${met('PM2.5',master.pm25_ugm3||master.pm25,'&micro;g/m&sup3;','pm25')}
+        ${met('Temp',tf,'&deg;F','temp')}
       </div>
-      ${def ? `<div class="dehumid-row">
+      ${def?`<div class="dehumid-row">
         <span class="dehumid-label">Dehumidifier</span>
-        <span class="pill ${def.desired_state === 'on' ? 'pill-on' : 'pill-off'}">${def.desired_state === 'on' ? 'Running' : 'Off'}</span>
-        <span class="dehumid-label">target 55–60%</span>
-      </div>` : ''}
+        <span class="pill ${def.desired_state==='on'?'pill-on':'pill-off'}">${def.desired_state==='on'?'Running':'Off'}</span>
+        <span class="dehumid-label">target 55&ndash;60%</span>
+      </div>`:''}
     </div>`;
   }
 
-  // Selah
-  if (selah) {
-    const sh = selah.humidity_pct || selah.humidity;
-    const ss = sc('hum', sh);
-    const stempF = selah.temperature_c ? (selah.temperature_c * 9/5 + 32) : null;
-    html += `<div class="section-label fade-in stagger-3">Air quality &mdash; Selah's room</div>
+  if(selah){
+    const sh=selah.humidity_pct||selah.humidity;
+    const stf=selah.temperature_c?(selah.temperature_c*9/5+32):null;
+    html+=`<div class="section-label fade-in stagger-3">Air quality &mdash; Selah's room</div>
     <div class="card fade-in stagger-3">
-      <div class="room-header">
-        <span class="room-name">Selah's room</span>
-        <span class="badge badge-${ss}">${Math.round(sh || 0)}% humidity</span>
-      </div>
+      <div class="room-header"><span class="room-name">Selah's room</span>
+        <span class="badge badge-${sc('hum',sh)}">${Math.round(sh||0)}% humidity</span></div>
       <div class="metrics-grid g3">
-        ${metric('Humidity', sh, '%', 'hum')}
-        ${metric('Temp', stempF, '°F', 'temp')}
-        ${metric('VOC', selah.voc_ppb || selah.voc, 'ppb', 'voc')}
+        ${met('Humidity',sh,'%','hum')}
+        ${met('Temp',stf,'&deg;F','temp')}
+        ${met('VOC',selah.voc_ppb||selah.voc,'ppb','voc')}
       </div>
     </div>`;
   }
 
-  // Thermostat
-  if (nest) {
-    const tf = nest.temp_f || (nest.temperature_c ? nest.temperature_c * 9/5 + 32 : nest.temp_c ? nest.temp_c * 9/5 + 32 : null);
-    const sf = nest.setpoint_cool_f || nest.setpoint_f;
-    html += `<div class="section-label fade-in stagger-4">Thermostat</div>
-    <div class="card fade-in stagger-4">
-      <div class="nest-grid">
-        ${metric('Indoor temp', tf, '°F', 'temp')}
-        ${metric('Setpoint', sf, '°F', 'temp')}
-        <div class="metric">
-          <div class="metric-label">HVAC</div>
-          <div class="metric-value" style="font-size:16px">${nest.hvac_status || '--'}</div>
-          <div class="metric-sub">${nest.thermostat_mode || ''} mode</div>
-        </div>
-      </div>
-    </div>`;
+  if(nest){
+    const tf=nest.temp_f||(nest.temperature_c?nest.temperature_c*9/5+32:nest.temp_c?nest.temp_c*9/5+32:null);
+    html+=`<div class="section-label fade-in stagger-4">Thermostat</div>
+    <div class="card fade-in stagger-4"><div class="metrics-grid g3">
+      ${met('Indoor temp',tf,'&deg;F','temp')}
+      ${met('Setpoint',nest.setpoint_cool_f||nest.setpoint_f,'&deg;F','temp')}
+      <div class="metric"><div class="metric-label">HVAC</div>
+        <div class="metric-value" style="font-size:15px">${nest.hvac_status||'--'}</div>
+        <div class="metric-sub">${nest.thermostat_mode||''} mode</div></div>
+    </div></div>`;
   }
 
-  // Sleep
-  if (readiness || sleep) {
-    html += `<div class="section-label fade-in stagger-5">Sleep &amp; readiness &mdash; Mia</div>
-    <div class="card fade-in stagger-5">
-      <div class="metrics-grid g2">
-        <div class="metric">
-          <div class="metric-label">Readiness</div>
-          <div class="metric-value">${readiness ? Math.round(readiness.score) : '--'}<span class="metric-unit"> /100</span></div>
-          ${readiness ? bar(readiness.score, 100, '#2D6A4F') : ''}
-          ${readiness ? `<div class="metric-sub">HRV ${readiness.hrv_balance || '--'} &middot; RHR ${readiness.resting_heart_rate || '--'} bpm</div>` : ''}
-        </div>
-        <div class="metric">
-          <div class="metric-label">Sleep score</div>
-          <div class="metric-value">${sleep ? Math.round(sleep.score) : '--'}<span class="metric-unit"> /100</span></div>
-          ${sleep ? bar(sleep.score, 100, '#1D6FA4') : ''}
-          ${sleep ? `<div class="metric-sub">Deep ${sleep.deep_sleep || '--'} &middot; REM ${sleep.rem_sleep || '--'}</div>` : ''}
-        </div>
+  if(readiness||sleep){
+    html+=`<div class="section-label fade-in stagger-5">Sleep &amp; readiness &mdash; Mia</div>
+    <div class="card fade-in stagger-5"><div class="metrics-grid g2">
+      <div class="metric"><div class="metric-label">Readiness</div>
+        <div class="metric-value">${readiness?Math.round(readiness.score):'--'}<span class="metric-unit"> /100</span></div>
+        ${readiness?bar(readiness.score,100,'#2D6A4F'):''}
+        ${readiness?`<div class="metric-sub">HRV ${readiness.hrv_balance||'--'} &middot; RHR ${readiness.resting_heart_rate||'--'} bpm</div>`:''}
       </div>
-    </div>`;
+      <div class="metric"><div class="metric-label">Sleep score</div>
+        <div class="metric-value">${sleep?Math.round(sleep.score):'--'}<span class="metric-unit"> /100</span></div>
+        ${sleep?bar(sleep.score,100,'#1D6FA4'):''}
+        ${sleep?`<div class="metric-sub">Deep ${sleep.deep_sleep||'--'} &middot; REM ${sleep.rem_sleep||'--'}</div>`:''}
+      </div>
+    </div></div>`;
   }
 
-  // Messages
-  if (msgs.length > 0) {
-    html += `<div class="section-label fade-in stagger-6">Recent messages</div>
-    <div class="card fade-in stagger-6 msg-list">`;
-    msgs.forEach(m => {
-      const t = new Date(m.received_at);
-      const ts = t.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      const txt = (m.text || m.content || '').replace(/\n/g, ' ').substring(0, 100);
-      html += `<div class="msg-item">
-        <div class="msg-row">
-          <span class="msg-sender">${m.sender_name || m.sender || 'Unknown'}</span>
-          <span class="msg-time">${ts}</span>
-        </div>
-        <div class="msg-text">${txt}${(m.text || m.content || '').length > 100 ? '...' : ''}</div>
+  if(msgs.length>0){
+    html+=`<div class="section-label fade-in stagger-6">Recent messages</div><div class="card fade-in stagger-6">`;
+    msgs.forEach(m=>{
+      const ts=new Date(m.received_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      const txt=(m.text||m.content||'').replace(/\n/g,' ').substring(0,100);
+      html+=`<div class="msg-item">
+        <div class="msg-row"><span class="msg-sender">${m.sender_name||m.sender||'Unknown'}</span><span class="msg-time">${ts}</span></div>
+        <div class="msg-text">${txt}${(m.text||m.content||'').length>100?'...':''}</div>
       </div>`;
     });
-    html += `</div>`;
+    html+=`</div>`;
   }
 
-  html += `<div class="last-updated">Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>`;
+  html+=`<div class="section-label fade-in stagger-7">Claude brief</div>
+  <div class="card fade-in stagger-7">
+    <button class="brief-btn" id="brief-btn" onclick="runBrief()">Generate household brief</button>
+    <div id="brief-output"></div>
+  </div>`;
 
-  document.getElementById('main').innerHTML = html;
-  document.getElementById('header-time').textContent = new Date().toLocaleString('en-US',{
-    weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'
-  });
+  html+=`<div class="last-updated">Updated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>`;
+  document.getElementById('main').innerHTML=html;
+  document.getElementById('header-time').textContent=new Date().toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 }
 
-async function loadData() {
-  const btn = document.getElementById('refresh-btn');
-  btn.classList.add('spinning');
-  btn.textContent = 'Loading...';
+async function runBrief(){
+  const btn=document.getElementById('brief-btn');
+  const out=document.getElementById('brief-output');
+  if(!dashboardData) return;
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner"></div> Generating...';
+  out.innerHTML='<div class="brief-loading"><div class="spinner"></div> Analyzing household data...</div>';
+
+  const d=dashboardData;
+  const ctx={};
+  if(d.household) d.household.forEach(r=>{ctx[r.key]=r.value;});
+  const due=new Date(ctx.mia_due_date||'2026-07-31');
+  const wLeft=Math.round((due-new Date())/(7*24*3600*1000));
+  const wPreg=40-wLeft;
+  const air=d.air||[];
+  const master=air.find(r=>r.device_id==='2960187261'||r.device_id==='master')||air[0];
+  const selah=air.find(r=>r.device_id==='selah-room'||r.device_id==='2920026883');
+
+  const payload={
+    pregnancy:{week:wPreg,weeks_remaining:wLeft},
+    master_bedroom:master?{
+      co2_ppm:master.co2_ppm||master.co2,
+      humidity_pct:master.humidity_pct||master.humidity,
+      pm25:master.pm25_ugm3||master.pm25,
+      temp_f:master.temperature_c?(master.temperature_c*9/5+32).toFixed(1):null,
+      voc_ppb:master.voc_ppb||master.voc,
+      radon:master.radon_pci||master.radon
+    }:null,
+    selah_room:selah?{
+      humidity_pct:selah.humidity_pct||selah.humidity,
+      temp_f:selah.temperature_c?(selah.temperature_c*9/5+32).toFixed(1):null,
+      voc_ppb:selah.voc_ppb||selah.voc
+    }:null,
+    thermostat:d.nest?{
+      temp_f:d.nest.temp_f||(d.nest.temp_c?d.nest.temp_c*9/5+32:null),
+      setpoint_f:d.nest.setpoint_cool_f||d.nest.setpoint_f,
+      hvac_status:d.nest.hvac_status,
+      mode:d.nest.thermostat_mode
+    }:null,
+    mia_sleep:d.sleep?{score:d.sleep.score,deep_sleep:d.sleep.deep_sleep,rem_sleep:d.sleep.rem_sleep,efficiency:d.sleep.efficiency}:null,
+    mia_readiness:d.readiness?{score:d.readiness.score,hrv_balance:d.readiness.hrv_balance,resting_heart_rate:d.readiness.resting_heart_rate}:null,
+    dehumidifier_state:d.dehumidifier&&d.dehumidifier.length>0?d.dehumidifier[0].desired_state:null
+  };
+
+  const prompt=`You are analyzing live household data for Vijay's home. His wife Mia is ${wPreg} weeks pregnant (due ${due.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}), ${wLeft} weeks away. They have a daughter Selah. Mia has allergies. No em dashes.
+
+Current data:
+${JSON.stringify(payload,null,2)}
+
+Provide a structured brief with exactly these five sections. Be specific and direct.
+
+**Air Quality**
+Status across master bedroom and Selah's room. Flag anything outside healthy ranges for a pregnant woman with allergies.
+
+**Comfort and Climate**
+Humidity control loop status, thermostat state, any temperature concerns.
+
+**Mia's Health Signals**
+Sleep and readiness scores in context of week ${wPreg} pregnancy. Note HRV and RHR if notable.
+
+**Alerts**
+Anything requiring attention today. If nothing urgent, say so clearly.
+
+**One Recommendation**
+One specific action to take today based on the data.
+
+2-4 sentences per section. Be direct and specific to the actual numbers.`;
+
   try {
-    const r = await fetch(API);
-    const d = await r.json();
+    const resp=await fetch(CLAUDE_API,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await resp.json();
+    const text=data.content&&data.content[0]?data.content[0].text:'';
+    if(!text){
+      out.innerHTML='<div class="brief-error">Could not generate brief.</div>';
+      btn.disabled=false; btn.innerHTML='Generate household brief';
+      return;
+    }
+    const sections=[];
+    let cur=null;
+    text.split('\n').forEach(line=>{
+      const h=line.match(/^\*\*(.+?)\*\*/);
+      if(h){if(cur) sections.push(cur); cur={title:h[1],body:[]};}
+      else if(cur&&line.trim()) cur.body.push(line.trim());
+    });
+    if(cur) sections.push(cur);
+    let bhtml='';
+    sections.forEach(s=>{
+      bhtml+=`<div class="brief-section">
+        <div class="brief-section-title">${s.title}</div>
+        <div class="brief-text">${s.body.join(' ')}</div>
+      </div>`;
+    });
+    bhtml+=`<div class="brief-ts">Generated ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>`;
+    out.innerHTML=bhtml;
+    btn.innerHTML='Regenerate brief';
+    btn.disabled=false;
+  } catch(e){
+    out.innerHTML=`<div class="brief-error">Error: ${e.message}</div>`;
+    btn.disabled=false; btn.innerHTML='Generate household brief';
+  }
+}
+
+async function loadData(){
+  const btn=document.getElementById('refresh-btn');
+  if(btn){btn.disabled=true;btn.textContent='Loading...';}
+  try{
+    const r=await fetch(API);
+    const d=await r.json();
     render(d);
-  } catch(e) {
-    document.getElementById('main').innerHTML = `<div class="loading-state" style="color:#991B1B">Failed to load data. Check connection.</div>`;
-  } finally {
-    btn.classList.remove('spinning');
-    btn.textContent = 'Refresh';
+  } catch(e){
+    document.getElementById('main').innerHTML=`<div style="display:flex;align-items:center;justify-content:center;padding:3rem;color:#991B1B;font-size:14px">Failed to load.</div>`;
+  } finally{
+    const b=document.getElementById('refresh-btn');
+    if(b){b.disabled=false;b.textContent='Refresh';}
   }
 }
 
 loadData();
-setInterval(loadData, 5 * 60 * 1000);
+setInterval(loadData,5*60*1000);
 </script>
 </body>
 </html>

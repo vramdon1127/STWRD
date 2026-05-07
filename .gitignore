@@ -5,3 +5,8 @@
 
 # Claude Code worktrees and session data
 .claude/
+.vercel
+.env*
+!.env.example
+supabase/.temp
+supabase/.branches

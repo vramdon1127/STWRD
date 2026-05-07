@@ -111,7 +111,7 @@
 </div>
 <script>
 const API = 'https://hrwgmqjqtoabttqvurkq.supabase.co/functions/v1/dashboard-data';
-const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+const CLAUDE_API = 'https://fnnegalrrdzcgoelljmi.supabase.co/functions/v1/claude-brief';
 let dashboardData = null;
 
 document.getElementById('header-time').textContent = new Date().toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
@@ -319,16 +319,19 @@ One specific action to take today based on the data.
 2-4 sentences per section. Be direct and specific to the actual numbers.`;
 
   try {
-    const resp=await fetch(CLAUDE_API,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    const resp = await fetch(CLAUDE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
     });
-    const data=await resp.json();
-    const text=data.content&&data.content[0]?data.content[0].text:'';
-    if(!text){
-      out.innerHTML='<div class="brief-error">Could not generate brief.</div>';
-      btn.disabled=false; btn.innerHTML='Generate household brief';
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Brief request failed: ${resp.status} ${errText}`);
+    }
+    const text = await resp.text();
+    if (!text) {
+      out.innerHTML = '<div class="brief-error">Could not generate brief.</div>';
+      btn.disabled = false; btn.innerHTML = 'Generate household brief';
       return;
     }
     const sections=[];

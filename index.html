@@ -5001,13 +5001,19 @@ async function renderStats() {
   const el = document.getElementById('statsGrid');
   if (!el) return;
 
+  // Resolve who is being viewed. Matches the pattern in renderBriefing
+  // (~lines 4646, 4651). viewingPartner swaps the global `tasks` array
+  // wholesale; server queries and added_by filters must also consult it.
+  const viewedUserId = viewingPartner && partnerData ? partnerData.id : currentUserId;
+  const viewedUserName = viewingPartner && partnerData ? partnerData.name : currentUser;
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const since = thirtyDaysAgo.toISOString();
 
   let completed = [];
   try {
-    completed = await sbFetch(`tasks?status=eq.done&user_id=eq.${currentUserId}&created_at=gte.${since}&order=completed_at.desc&limit=200`) || [];
+    completed = await sbFetch(`tasks?status=eq.done&user_id=eq.${viewedUserId}&created_at=gte.${since}&order=completed_at.desc&limit=200`) || [];
   } catch(e) {}
 
   const today = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
@@ -5033,8 +5039,8 @@ async function renderStats() {
   const maxProj = Math.max(...projData.map(p => p.count), 1);
   const totalCat = aiComplete + aiAssist + manual || 1;
   const aiPct = Math.round(((aiComplete + aiAssist) / totalCat) * 100);
-  const myCount = active.filter(t => t.added_by === currentUser).length;
-  const teamCount = active.filter(t => t.added_by !== currentUser && t.added_by).length;
+  const myCount = active.filter(t => t.added_by === viewedUserName).length;
+  const teamCount = active.filter(t => t.added_by !== viewedUserName && t.added_by).length;
 
   el.innerHTML = `
     <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">Dashboard</div>
@@ -5111,11 +5117,11 @@ async function renderStats() {
     <div class="stat-card" style="margin-bottom:16px;">
       <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);margin-bottom:14px;">Task Owners</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center;">
-        <div onclick="showDrilldown('Your Tasks', t => t.added_by === currentUser)" style="background:rgba(108,99,255,0.1);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(108,99,255,0.2)'" onmouseout="this.style.background='rgba(108,99,255,0.1)'">
+        <div onclick="showDrilldown('Your Tasks', t => t.added_by === '${viewedUserName}')" style="background:rgba(108,99,255,0.1);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(108,99,255,0.2)'" onmouseout="this.style.background='rgba(108,99,255,0.1)'">
           <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--accent);">${myCount}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:2px;">You</div>
         </div>
-        <div onclick="showDrilldown('Team Tasks', t => t.added_by !== currentUser && t.added_by)" style="background:rgba(255,101,132,0.1);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,101,132,0.2)'" onmouseout="this.style.background='rgba(255,101,132,0.1)'">
+        <div onclick="showDrilldown('Team Tasks', t => t.added_by !== '${viewedUserName}' && t.added_by)" style="background:rgba(255,101,132,0.1);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,101,132,0.2)'" onmouseout="this.style.background='rgba(255,101,132,0.1)'">
           <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--accent2);">${teamCount}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:2px;">Team</div>
         </div>

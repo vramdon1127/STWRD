@@ -1,6 +1,6 @@
 # C1 Phase 2 — Server-side gcal token refresh
 
-**Status:** Design — not yet implemented
+**Status:** Shipped 5/3/26 (commit `ace5a6a`). Verified end-to-end 5/13/26: self-refresh returns 200 with `ya29.` access token; partner-refresh chain executes correctly through JWT verify → `is_partner_or_self` RPC → service-role profile read → Google exchange → `invalid_grant` recovery path. Mia stored refresh token was stale at verification time; recovery correctly NULLed her `gcal_refresh_token`. Mia needs to re-sign-in with `prompt:'consent'` to repopulate before partner-view calendar reads work.
 **Depends on:** C1 Phase 1 (commit `5a52dd1`, shipped 5/2/26)
 **Blocks:** Partner-view calendar reads (B-series briefing items)
 

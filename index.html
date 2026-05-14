@@ -7203,6 +7203,7 @@ async function switchView(mode) {
     renderTomorrowBriefing();
     renderHorizonBriefing();
     renderTasks();
+    renderStats();
     togglePartnerPanel();
     showToast(`👀 Viewing ${partnerData.name}'s world`);
   } else {
@@ -7218,6 +7219,7 @@ async function switchView(mode) {
     renderTomorrowBriefing();
     renderHorizonBriefing();
     renderTasks();
+    renderStats();
     togglePartnerPanel();
     showToast('🏠 Back to your world');
   }
@@ -7381,7 +7383,7 @@ async function unlinkPartner(partnershipId) {
     await sbFetch(`partnerships?id=eq.${partnershipId}`, 'DELETE');
     partnerData = null;
     viewingPartner = false;
-    if (myTasks.length > 0) { tasks = [...myTasks]; userHats = [...myHats]; renderTasks(); }
+    if (myTasks.length > 0) { tasks = [...myTasks]; userHats = [...myHats]; renderTasks(); renderStats(); }
     renderPartnerPanel(null);
     togglePartnerPanel();
     showToast('Partner unlinked');

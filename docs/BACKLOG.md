@@ -14,6 +14,25 @@ Last updated: 2026-05-04 (post-auth-refresh fix + Sunday ships + repo cleanup)
 
 - **Beta guide PDF refresh.** Doesn't reflect partner calendar feature, life areas hide, or tonight's silent-auth-refresh behavior. Update before next beta-onboarding moment.
 
+## iMessage sync — capture sent messages + surface in Brief
+
+Two separate loops, do not bundle:
+
+1. Sync pipeline change: capture MY sent messages, not just incoming.
+   - PRIVACY REVIEW REQUIRED before building. This expands what personal
+     message data flows local Mac -> Supabase imessages table -> digest.
+     Decide explicitly: what gets stored, what the digest does with it,
+     what the surface looks like with beta couples involved.
+   - Scope this as its own loop. Touches the local Node.js pipeline.
+
+2. Brief tab surfacing: show message-derived reminders in the Brief tab
+   itself, not only the digest.
+   - Separate loop. Touches Brief rendering in index.html.
+   - Depends on loop 1 landing first (needs the sent-message data).
+
+Captured 5/14/26. Deferred from end-of-day — needs a fresh session,
+working terminal, clear head, one loop at a time.
+
 ---
 
 ## Bugs (real, observable)

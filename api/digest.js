@@ -396,9 +396,12 @@ async function triageInbox(briefing) {
     from: t.resolved_name || t.sender,
     relationship: t.relationship,
     last_message_at: t.last_at,
+    last_message_from_me: t.last_message_from_me,
+    last_inbound_at: t.last_inbound_at,
+    last_outbound_at: t.last_outbound_at,
     messages: t.messages
-      ? t.messages.slice(-3).map(m => m.text)
-      : (t.text ? [t.text] : []),
+      ? t.messages.slice(-3).map(m => ({ from_me: m.from_me, text: m.text }))
+      : (t.text ? [{ from_me: false, text: t.text }] : []),
   }));
 
   const emailsForClaude = [];
@@ -432,6 +435,8 @@ Surface only items that genuinely need attention today. Skip:
 - Anything that can wait a week with zero consequence
 
 Order matters — the most important item is first in each list. Order IS the priority signal. Do not include numeric scores or priority labels.
+
+Each text thread includes direction data. \`last_message_from_me: true\` means Vijay already replied — the loop is likely closed; only surface it if his reply was clearly partial or left a question open. \`last_message_from_me: false\` means the other person is waiting on him — this is the primary "needs a reply" signal. Each message also has \`from_me\` so you can see who said what. For group chats, weigh whether the last inbound is genuinely pressing or just ongoing chatter.
 
 For "why": one sentence. Not a summary of the message — the REASON it earned attention. Examples:
 - "she already picked Hat Creek, just confirm to the group"

@@ -9,9 +9,9 @@ File IRA 2024 tax return | AI Assist | file read as physical action
 Finish reviewing the acquisition accounting narrative | AI Assist | reviewing verb misread
 Finish reviewing tax narrative | AI Assist | reviewing verb misread; corrected live 5/14
 When updating narratives in Workiva verify risks match the RCM | AI Assist | verify verb misread
-Review if digest email is sent to partner after account linking | AI Assist | DISPUTED dev task
+Review if digest email is sent to partner after account linking | AI Assist | resolved 5/14 - analytical work, AI-assistable
 Review Protiviti SOD report and verify no control gaps missed | AI Assist | review/verify misread
-Refactor STWRD app to modular architecture | AI Assist | DISPUTED dev task
+Refactor STWRD app to modular architecture | AI Assist | resolved 5/14 - will be worked with Claude + Claude Code
 Note bug in STWRD copy-message button including header formatting | AI Assist | note-a-bug misread
 
 ## Known-correct Manual (regression guard - must NOT move)
@@ -27,9 +27,17 @@ Write a thank-you note to aunt Sarah | AI Complete | AI drafts user sends
 
 ## Diagnosis (5/14/26)
 
-Classifier tags analytical verbs (review verify note refactor file) as Manual. The AI Assist intent-word list omits them. Likely fix: add review/verify/analyze/note verbs to AI Assist intent words. Tune against this battery, verify before/after, do not ship blind.
+All 8 mis-tagged tasks resolved to AI Assist - not one was genuinely Manual.
+The classifier is not confusing three categories; it specifically fails to
+recognize AI-Assist-class work and dumps it in Manual. Pattern: analytical
+verbs (review, verify, note, refactor, file) get read as physical/Manual.
+The AI Assist intent-word list in the prompt omits these.
+Likely fix: add review/verify/analyze/note-style verbs to the AI Assist
+intent words. Tune against this battery, verify before/after, do not ship blind.
 
 ## Open questions before tuning
 
-- Two DISPUTED dev tasks: AI Assist or Manual or own handling? Resolve before relying on battery.
+- Bucket system has a blind spot for project-scale dev work (e.g. the refactor).
+  Resolved as AI Assist for now since AI is the tool being used, but worth
+  watching whether dev projects need their own handling someday.
 - Battery needs more borderline examples over time.

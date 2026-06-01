@@ -129,14 +129,29 @@ export default async function handler(req, res) {
     let errors = [];
 
     for (const profile of profiles) {
+      const briefingForUser = PERSONAL_BRIEFING_USER_IDS.has(profile.id)
+        ? personalBriefing
+        : null;
+
       try {
-        const briefingForUser = PERSONAL_BRIEFING_USER_IDS.has(profile.id)
-          ? personalBriefing
-          : null;
         await sendDigestToUser(profile, resendKey, briefingForUser);
         sent++;
       } catch (e) {
         errors.push({ user: profile.id, error: e.message });
+      }
+
+      // Brief assembly is best-effort and runs independently of the email send.
+      // A failure here must not prevent the digest from being delivered.
+      try {
+        const actionables = await assembleActionables(briefingForUser, profile.id);
+        const briefDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+        await upsertDailyBrief(profile.id, briefDate, {
+          generated_at: new Date().toISOString(),
+          actionables,
+          raw_triage: briefingForUser?.triage || null,
+        });
+      } catch (err) {
+        console.error(`Brief assembly failed for ${profile.id}:`, err.message);
       }
     }
 
@@ -392,32 +407,68 @@ async function triageInbox(briefing) {
     return { texts: [], emails: [] };
   }
 
-  const textsForClaude = rawTexts.map(t => ({
-    from: t.resolved_name || t.sender,
-    relationship: t.relationship,
-    last_message_at: t.last_at,
-    last_message_from_me: t.last_message_from_me,
-    last_inbound_at: t.last_inbound_at,
-    last_outbound_at: t.last_outbound_at,
-    messages: t.messages
-      ? t.messages.slice(-3).map(m => ({ from_me: m.from_me, text: m.text }))
-      : (t.text ? [{ from_me: false, text: t.text }] : []),
-  }));
+  // Each input carries a stable `id` (deterministic from raw fields). Claude
+  // is told to echo the matching id in each surfaced item; we use that to
+  // merge metadata back so the Brief view has a real source identifier.
+  // _raw stays server-side and is stripped before we send to Claude.
+  const textsForClaude = rawTexts.map(t => {
+    const sender = t.sender || t.handle || 'unknown';
+    const lastInboundAt = t.last_inbound_at || t.last_at || '';
+    const id = `imessage:${sender}:${lastInboundAt}`;
+    const lastInbound = Array.isArray(t.messages)
+      ? [...t.messages].reverse().find(m => !m.from_me)
+      : null;
+    const lastInboundSnippet = (lastInbound?.text || t.text || '').slice(0, 280);
+    return {
+      _raw: {
+        sender,
+        last_inbound_at: lastInboundAt,
+        last_inbound_snippet: lastInboundSnippet,
+      },
+      id,
+      from: t.resolved_name || sender,
+      relationship: t.relationship,
+      last_message_at: t.last_at,
+      last_message_from_me: t.last_message_from_me,
+      last_inbound_at: lastInboundAt,
+      last_outbound_at: t.last_outbound_at,
+      messages: t.messages
+        ? t.messages.slice(-3).map(m => ({ from_me: m.from_me, text: m.text }))
+        : (t.text ? [{ from_me: false, text: t.text }] : []),
+    };
+  });
 
   const emailsForClaude = [];
   for (const acct of rawAccounts) {
     for (const th of (acct.threads || [])) {
+      const fromAddress = th.from_address || '';
+      const subject = th.subject || '';
+      const receivedAt = th.received_at || '';
+      const id = 'gmail:' + Buffer.from(`${fromAddress}|${subject}|${receivedAt}`)
+        .toString('base64url').slice(0, 32);
       emailsForClaude.push({
+        _raw: {
+          from_address: fromAddress,
+          subject,
+          snippet: th.snippet || '',
+          received_at: receivedAt,
+        },
+        id,
         account: acct.context || acct.account,
         from: th.from_name || th.from_address || th.from,
-        from_address: th.from_address,
-        subject: th.subject,
+        from_address: fromAddress,
+        subject,
         snippet: (th.snippet || '').slice(0, 300),
         unread: th.unread,
-        received_at: th.received_at,
+        received_at: receivedAt,
       });
     }
   }
+
+  const stripRaw = arr => arr.map(({ _raw, ...rest }) => rest);
+  const byId = new Map();
+  textsForClaude.forEach(t => byId.set(t.id, { kind: 'text', raw: t._raw }));
+  emailsForClaude.forEach(e => byId.set(e.id, { kind: 'email', raw: e._raw }));
 
   const systemPrompt = `You are triaging Vijay's inbox for his daily morning digest. You know his life:
 
@@ -443,19 +494,21 @@ For "why": one sentence. Not a summary of the message — the REASON it earned a
 - "10 fresh GNE leads, these decay in hours"
 - "Taylor is following up a second time on a meeting that was supposed to close last week"
 
+Each input item has an \`id\` field. You MUST copy that id verbatim into the matching surfaced item so downstream code can link your judgment back to the source.
+
 Return ONLY valid JSON, no preamble, no markdown fences:
 {
-  "texts": [{ "from": "...", "what": "...", "why": "..." }],
-  "emails": [{ "from": "...", "subject": "...", "why": "..." }]
+  "texts": [{ "id": "...", "from": "...", "what": "...", "why": "..." }],
+  "emails": [{ "id": "...", "from": "...", "subject": "...", "why": "..." }]
 }
 
 If nothing in a category warrants surfacing, return an empty array for that category. Empty arrays are fine and expected — quiet morning is real signal.`;
 
   const userPrompt = `INBOUND TEXTS (last 24h):
-${JSON.stringify(textsForClaude, null, 2)}
+${JSON.stringify(stripRaw(textsForClaude), null, 2)}
 
 UNREAD/RECENT EMAILS (last 24h, after noise filtering):
-${JSON.stringify(emailsForClaude, null, 2)}
+${JSON.stringify(stripRaw(emailsForClaude), null, 2)}
 
 Triage. Return JSON only.`;
 
@@ -483,9 +536,25 @@ Triage. Return JSON only.`;
     const text = data?.content?.[0]?.text || '';
     const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const parsed = JSON.parse(clean);
+
+    // Merge raw metadata onto Claude's output via id lookup. When Claude
+    // omits or hallucinates an id, the item still flows through to the
+    // email digest (which only needs from/what/why/subject), but it lacks
+    // the fields the Brief view needs and will be dropped by
+    // assembleActionables. Email behavior unchanged.
+    const enrichItem = (item, expectedKind) => {
+      const meta = item.id ? byId.get(item.id) : null;
+      if (!meta || meta.kind !== expectedKind) return item;
+      return { ...item, ...meta.raw };
+    };
+
     return {
-      texts: Array.isArray(parsed.texts) ? parsed.texts : [],
-      emails: Array.isArray(parsed.emails) ? parsed.emails : [],
+      texts: Array.isArray(parsed.texts)
+        ? parsed.texts.map(t => enrichItem(t, 'text'))
+        : [],
+      emails: Array.isArray(parsed.emails)
+        ? parsed.emails.map(e => enrichItem(e, 'email'))
+        : [],
     };
   } catch (err) {
     console.error('triageInbox failed:', err.message);
@@ -592,4 +661,123 @@ function renderHouseholdCard(briefing) {
       ${sections.join('')}
     </div>
   `;
+}
+
+// ============================================================================
+// Brief view (Phase 1) — structured actionables persisted per user per day.
+//
+// assembleActionables transforms the same triage data that powers the email
+// household card into a checkbox-friendly shape the client can render and
+// promote to STWRD tasks. The email digest is unaffected.
+//
+// Item categories surfaced in v1:
+//   needs_reply  — iMessage / Gmail threads Claude flagged as worth a response
+//   stale_task   — STWRD tasks older than 7 days that are still open
+//
+// The item id is the source_dedup_key for needs_reply items (built from
+// stable handle + last-inbound timestamp), so re-running the digest the
+// same day will reproduce the same key, but a follow-up message gets a
+// fresh key. stale_task ids carry the task uuid; they're review-only in v1
+// and source_dedup_key stays null since the task already exists.
+// ============================================================================
+
+async function assembleActionables(briefing, userId) {
+  const items = [];
+  const triage = briefing?.triage || { texts: [], emails: [] };
+
+  for (const t of triage.texts || []) {
+    if (!t.id || !t.sender) continue; // skip items triageInbox couldn't enrich
+    const from = t.from || t.sender;
+    const snippet = (t.last_inbound_snippet || t.what || '').slice(0, 140);
+    items.push({
+      id: t.id,
+      category: 'needs_reply',
+      subtype: 'imessage',
+      title: `${from} · needs your reply`,
+      snippet,
+      reason: t.why || '',
+      source_type: 'imessage',
+      source_id: t.id,
+      source_dedup_key: t.id,
+      task_title: `Reply to ${from}`,
+      promoted: false,
+    });
+  }
+
+  for (const e of triage.emails || []) {
+    if (!e.id || !e.from_address) continue;
+    const subject = e.subject || '(no subject)';
+    const snippet = (e.snippet || '').slice(0, 140);
+    items.push({
+      id: e.id,
+      category: 'needs_reply',
+      subtype: 'gmail',
+      title: subject,
+      snippet,
+      reason: e.why || '',
+      source_type: 'gmail',
+      source_id: e.id,
+      source_dedup_key: e.id,
+      task_title: `Reply: ${subject}`,
+      promoted: false,
+    });
+  }
+
+  try {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoIso = weekAgo.toISOString();
+    const staleTasks = await sbFetch(
+      `tasks?user_id=eq.${userId}&status=neq.done&created_at=lt.${encodeURIComponent(weekAgoIso)}&order=created_at.asc&limit=10`,
+      true
+    ) || [];
+
+    for (const task of staleTasks) {
+      const title = task.cleaned_task || task.content || '(untitled task)';
+      const meta = [task.project, task.priority].filter(Boolean).join(' · ');
+      items.push({
+        id: `stale_task:${task.id}`,
+        category: 'stale_task',
+        title,
+        snippet: meta,
+        reason: '',
+        source_type: 'stwrd_task',
+        source_id: String(task.id),
+        source_dedup_key: null,
+        task_title: title,
+        action: 'review',
+        promoted: false,
+      });
+    }
+  } catch (err) {
+    console.error(`assembleActionables: stale tasks query failed for ${userId}:`, err.message);
+  }
+
+  return items;
+}
+
+async function upsertDailyBrief(userId, briefDate, payload) {
+  const serviceKey = getServiceKey();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/daily_briefs?on_conflict=user_id,brief_date`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': serviceKey,
+        'Authorization': `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        brief_date: briefDate,
+        payload,
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`daily_briefs upsert ${res.status}: ${errText.slice(0, 300)}`);
+  }
 }

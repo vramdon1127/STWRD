@@ -2958,6 +2958,7 @@ RECUR: [weekly OR monthly OR none — weekly if task repeats every week like lau
 LIFE: [${lifeAreaNames}]
 REASON: [one short sentence why]
 
+Project guide: Choose exactly one project from the list. Never invent a project name not on the list. STWRD or Knot app work (features, bugs, UI, architecture, product research) => App Development. ServeAnts CPA business (tax, client work, LLC filings, registered agent, business email) => ServeAnts.
 Priority guide: P1=urgent/today, P2=important/this week, P3=normal, P4=low/someday
 Category guide — pick based on whether AI can FINISH the task from the task description alone:
 
@@ -3023,11 +3024,17 @@ Added by: ${currentUser}`;
     const recurRaw = get('RECUR') || 'none';
     const recurrence = ['weekly','monthly'].includes(recurRaw.toLowerCase()) ? recurRaw.toLowerCase() : 'none';
 
+    // Model output is free text — only names from the projects table may be
+    // written. Anything else falls back to Personal. DB trigger (migration i3)
+    // is the backstop for writes that skip this path.
+    const projectRaw = get('PROJECT');
+    const project = userHats.some(p => p.name === projectRaw) ? projectRaw : 'Personal';
+
     const task = {
       content: raw,
       cleaned_task: get('TASK'),
       category: (() => { const c = get('CATEGORY'); if (c.includes('AI Complete')) return 'AI Complete'; if (c.includes('AI Assist')) return 'AI Assist'; if (c.includes('Manual')) return 'Manual'; return 'AI Assist'; })(),
-      project: get('PROJECT'),
+      project: project,
       priority: get('PRIORITY'),
       due_date: dueDate,
       recurrence: recurrence,

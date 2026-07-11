@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd schedule for the STWRD background agent (OPT-IN, install last).
+
+  Do NOT load this until you have run scripts/agent-loop.sh by hand at least
+  once and reviewed the branch it produced. This runs one loop per day at
+  8:05am CT. It only produces a review branch; it never pushes or merges.
+
+  Install:
+    1. Edit the two REPLACE_ME paths below to absolute paths on your Mac.
+    2. cp agent/com.stwrd.agent-loop.plist ~/Library/LaunchAgents/
+    3. launchctl load ~/Library/LaunchAgents/com.stwrd.agent-loop.plist
+  Remove:
+    launchctl unload ~/Library/LaunchAgents/com.stwrd.agent-loop.plist
+
+  Note: `claude` must be resolvable for the launchd environment. If the agent
+  can't find it, set the full path to claude in an EnvironmentVariables PATH
+  entry, or invoke it explicitly inside agent-loop.sh.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.stwrd.agent-loop</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>REPLACE_ME/Documents/GitHub/STWRD/scripts/agent-loop.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>REPLACE_ME/Documents/GitHub/STWRD</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>5</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>REPLACE_ME/.stwrd-agent/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>REPLACE_ME/.stwrd-agent/launchd.err.log</string>
+</dict>
+</plist>

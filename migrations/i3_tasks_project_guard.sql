@@ -119,3 +119,5 @@ CREATE TRIGGER tasks_project_guard
 --
 -- DROP TRIGGER IF EXISTS tasks_project_guard ON public.tasks;
 -- DROP FUNCTION IF EXISTS public.enforce_task_project();
+
+REVOKE EXECUTE ON FUNCTION public.enforce_task_project() FROM PUBLIC, anon, authenticated;

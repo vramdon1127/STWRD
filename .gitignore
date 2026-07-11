@@ -10,3 +10,6 @@
 !.env.example
 supabase/.temp
 supabase/.branches
+# STWRD background agent run artifacts
+agent/runs/
+agent/*.claude.json

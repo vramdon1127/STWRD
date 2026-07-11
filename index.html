@@ -1669,6 +1669,11 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   }
 });
 
+// Expose sbClient for console debugging on local/dev hosts only — never in production.
+if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+  window.__sb = sbClient;
+}
+
 // ─── PWA DETECTION ───────────────────────────────────────────
 const isPWA = window.navigator.standalone === true ||
               window.matchMedia('(display-mode: standalone)').matches;

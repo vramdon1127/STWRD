@@ -1,0 +1,24 @@
+name: validate
+
+# Independent backstop for the STWRD validation gate. Runs the exact same
+# script the headless backlog agent runs locally (scripts/validate.mjs), so the
+# agent's self-check and CI can never drift. Offline checks only: JS syntax of
+# every serverless function and the inline index.html app script, plus a
+# committed-secret scan. The live category/project batteries are NOT run here —
+# they cost real Claude API calls and hit production, so they stay opt-in
+# (node scripts/validate.mjs --batteries) rather than firing on every push.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run validation gate
+        run: node scripts/validate.mjs

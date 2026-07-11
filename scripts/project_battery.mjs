@@ -305,3 +305,7 @@ if (bad.length) {
     if (f.error) console.log(`  error: ${f.error}`);
   }
 }
+
+// Exit non-zero when any case FAILs or ERRORs so the battery can gate a build
+// on its own. WARN cases (guard-uncatchable) are intentionally not fatal.
+process.exit(bad.length ? 1 : 0);

@@ -161,3 +161,6 @@ if (fails.length) {
     if (f.error) console.log(`  error: ${f.error}`);
   }
 }
+
+// Exit non-zero when any case fails so the battery can gate a build on its own.
+process.exit(fails.length ? 1 : 0);

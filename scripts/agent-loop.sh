@@ -35,6 +35,7 @@ QUEUE="$REPO_ROOT/agent/queue.md"
 RUN_DIR="$REPO_ROOT/agent/runs"
 STAMP="$(date +%Y-%m-%d-%H%M%S)"
 BRANCH="claude/auto-$STAMP"
+FROM_QUEUE=0
 mkdir -p "$RUN_DIR"
 LOG="$RUN_DIR/$STAMP.md"
 
@@ -45,6 +46,28 @@ discard_branch() {
   git clean -fd --quiet 2>/dev/null || true
   git checkout "$BASE_BRANCH" --quiet 2>/dev/null || true
   git branch -D "$BRANCH" --quiet 2>/dev/null || true
+}
+
+# Advance the queue after an item is processed so scheduled/unattended runs move
+# to the next item instead of redoing the first one forever. Marks the first
+# unchecked item done with the outcome. Only ever edits agent/queue.md, which is
+# gitignored, so it never dirties the tree for the next run's preflight. No-op
+# for manual runs (item passed as an argument, FROM_QUEUE=0).
+mark_done() {
+  [ "$FROM_QUEUE" = "1" ] || return 0
+  QUEUE="$QUEUE" OUTCOME="$1" STAMP="$STAMP" python3 - <<'PY' 2>/dev/null || true
+import os
+q, outcome, stamp = os.environ['QUEUE'], os.environ['OUTCOME'], os.environ['STAMP']
+try:
+    lines = open(q, encoding='utf-8').read().split('\n')
+except FileNotFoundError:
+    raise SystemExit(0)
+for i, l in enumerate(lines):
+    if l.startswith('- [ ] '):
+        lines[i] = '- [x] ' + l[6:] + f'  → {outcome} ({stamp})'
+        break
+open(q, 'w', encoding='utf-8').write('\n'.join(lines))
+PY
 }
 
 # --- 0. Preflight -----------------------------------------------------------
@@ -65,6 +88,7 @@ fi
 ITEM="${1:-}"
 if [ -z "$ITEM" ] && [ -f "$QUEUE" ]; then
   ITEM="$(grep -m1 '^- \[ \] ' "$QUEUE" | sed 's/^- \[ \] //' || true)"
+  [ -n "$ITEM" ] && FROM_QUEUE=1
 fi
 if [ -z "$ITEM" ]; then
   log "No item to work. Pass one as an argument, or add a '- [ ] ...' line to agent/queue.md."
@@ -113,6 +137,7 @@ log "claude exit code: $CLAUDE_RC"
 CHANGED="$(git status --porcelain | sed 's/^...//')"
 if [ -z "$CHANGED" ]; then
   log "No file changes produced. Discarding branch; base untouched."
+  mark_done "no changes"
   discard_branch
   exit 0
 fi
@@ -121,6 +146,7 @@ log "changed files:"
 printf '%s\n' "$CHANGED" | sed 's/^/  - /' | tee -a "$LOG"
 if printf '%s\n' "$CHANGED" | grep -Eq '(^|/)\.env|^migrations/|^\.github/'; then
   log "ABORT: agent touched a forbidden path (.env / migrations / .github). Discarding."
+  mark_done "aborted: forbidden path"
   discard_branch
   exit 1
 fi
@@ -133,6 +159,7 @@ set -e
 log "validate.mjs exit code: $GATE_RC"
 if [ "$GATE_RC" -ne 0 ]; then
   log "GATE FAILED. Discarding branch; base untouched. See log above."
+  mark_done "gate failed"
   discard_branch
   exit 1
 fi
@@ -147,4 +174,5 @@ log "COMMITTED to $BRANCH (not pushed)."
 log "Review:  git log -p $BRANCH"
 log "Merge:   git checkout $BASE_BRANCH && git merge --no-ff $BRANCH   (then push yourself)"
 git checkout "$BASE_BRANCH" --quiet
+mark_done "committed $BRANCH"
 log "Back on $BASE_BRANCH. Done."

@@ -7324,7 +7324,7 @@ async function sendInviteEmail() {
       }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Send failed');
+    if (!res.ok) throw new Error(data.error?.message || 'Send failed');
     // Brief success state — prevents accidental double-send.
     btn.textContent = 'Invite sent ✓';
     btn.style.background = 'var(--done)';

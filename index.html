@@ -2142,7 +2142,7 @@ async function refreshGcalToken(userId) {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      console.log('[STWRD] gcal refresh failed:', res.status, body.error || '');
+      console.log('[STWRD] gcal refresh failed:', res.status, body.error?.message || '');
       return null;
     }
     const { access_token, expires_in } = await res.json();
@@ -6875,7 +6875,7 @@ async function testDigest() {
     if (data.success) {
       showToast('✓ Test email sent to ' + data.sent_to);
     } else {
-      showToast('❌ ' + (data.error || 'Send failed'));
+      showToast('❌ ' + (data.error?.message || 'Send failed'));
     }
   } catch(e) {
     showToast('❌ Could not reach digest endpoint');

@@ -47,6 +47,7 @@ function listFiles(dir, filter) {
 const standaloneJs = [
   ...listFiles(join(ROOT, 'api'), (n) => n.endsWith('.js')),
   ...listFiles(join(ROOT, 'scripts'), (n) => n.endsWith('.mjs') && n !== 'validate.mjs'),
+  ...listFiles(join(ROOT, 'lib'), (n) => n.endsWith('.mjs') || n.endsWith('.js')),
 ];
 
 // Inline <script> blocks inside index.html.
@@ -168,11 +169,36 @@ function runBattery(scriptRel, label) {
   if (!ok) console.log(out.split('\n').filter((l) => l.startsWith('#') || l.includes('expected') || l.includes('got')).slice(0, 40).map((l) => '  ' + l).join('\n'));
 }
 
+// --- check: unit tests (node --test over test/) -----------------------------
+
+function runUnitTests() {
+  const testDir = join(ROOT, 'test');
+  if (!existsSync(testDir)) {
+    record('unit-tests', true, 'no test/ dir (skipped)');
+    return;
+  }
+  const files = listFiles(testDir, (n) => n.endsWith('.test.mjs'));
+  if (!files.length) {
+    record('unit-tests', true, 'no *.test.mjs files (skipped)');
+    return;
+  }
+  const r = spawnSync(process.execPath, ['--test', ...files], { encoding: 'utf8' });
+  const out = (r.stdout || '') + (r.stderr || '');
+  const passM = out.match(/#\s*pass\s+(\d+)/);
+  const failM = out.match(/#\s*fail\s+(\d+)/);
+  const pass = passM ? Number(passM[1]) : 0;
+  const fail = failM ? Number(failM[1]) : (r.status === 0 ? 0 : 1);
+  const ok = r.status === 0 && fail === 0;
+  record('unit-tests', ok, `${pass} passed${fail ? `, ${fail} failed` : ''} across ${files.length} file(s)`);
+  if (!ok) console.log(out.split('\n').filter((l) => /not ok|Error|AssertionError|✖|✗/.test(l)).slice(0, 40).map((l) => '  ' + l).join('\n'));
+}
+
 // --- run ---------------------------------------------------------------------
 
 console.log(`STWRD validate — root: ${ROOT}${RUN_BATTERIES ? ' (with batteries)' : ''}\n`);
 runSyntaxCheck();
 runSecretScan();
+runUnitTests();
 if (RUN_BATTERIES) {
   runBattery('scripts/category_battery.mjs', 'category-battery');
   runBattery('scripts/project_battery.mjs', 'project-battery');

@@ -10,6 +10,11 @@
 <title>STWRD</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  // Bridge: expose the tested pure stats module (lib/stats.mjs) to the classic inline script.
+  import { computeStats } from './lib/stats.mjs';
+  window.computeStats = computeStats;
+</script>
 <style>
   .life-areas-hidden { display: none !important; }
   :root {
@@ -5035,25 +5040,10 @@ async function renderStats() {
   const weekAgoStr = weekAgo.toLocaleDateString('en-CA', {timeZone: 'America/Chicago'});
 
   const active = tasks;
-  const total = active.length;
-  const p1 = active.filter(t => t.priority === 'P1').length;
-  const dueToday = active.filter(t => t.due_date === today).length;
-  const aiComplete = active.filter(t => t.category === 'AI Complete').length;
-  const aiAssist = active.filter(t => t.category === 'AI Assist').length;
-  const manual = active.filter(t => t.category === 'Manual').length;
-  const completedThisWeek = completed.filter(t => t.created_at >= weekAgoStr).length;
-  const addedThisWeek = active.filter(t => t.created_at >= weekAgoStr).length + completedThisWeek;
-  const completionRate = addedThisWeek > 0 ? Math.round((completedThisWeek / addedThisWeek) * 100) : 0;
-  const projData = userHats.map(hat => ({
-    name: hat.name,
-    color: hat.color || 'var(--accent)',
-    count: active.filter(t => t.project === hat.name).length
-  }));
-  const maxProj = Math.max(...projData.map(p => p.count), 1);
-  const totalCat = aiComplete + aiAssist + manual || 1;
-  const aiPct = Math.round(((aiComplete + aiAssist) / totalCat) * 100);
-  const myCount = active.filter(t => t.added_by === viewedUserName).length;
-  const teamCount = active.filter(t => t.added_by !== viewedUserName && t.added_by).length;
+  const { total, p1, dueToday, aiComplete, aiAssist, manual,
+          completedThisWeek, addedThisWeek, completionRate,
+          projData, maxProj, totalCat, aiPct, myCount, teamCount } =
+    window.computeStats({ active, completed, userHats, viewedUserName, today, weekAgoStr });
 
   el.innerHTML = `
     <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;">Dashboard</div>

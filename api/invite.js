@@ -9,36 +9,36 @@ const STWRD_DOMAIN = 'https://getstwrd.com';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: { message: 'Method not allowed' } });
   }
 
   const { partnerEmail, inviteToken, inviterName, inviterEmail } = req.body || {};
 
   // ── Validation ──────────────────────────────────────────────
   if (!partnerEmail || typeof partnerEmail !== 'string' || !EMAIL_REGEX.test(partnerEmail.trim())) {
-    return res.status(400).json({ error: 'Invalid partnerEmail' });
+    return res.status(400).json({ error: { message: 'Invalid partnerEmail' } });
   }
   if (!inviteToken || typeof inviteToken !== 'string' || !UUID_REGEX.test(inviteToken)) {
-    return res.status(400).json({ error: 'Invalid inviteToken' });
+    return res.status(400).json({ error: { message: 'Invalid inviteToken' } });
   }
   if (!inviterName || typeof inviterName !== 'string' || inviterName.trim().length === 0 || inviterName.length > 60) {
-    return res.status(400).json({ error: 'Invalid inviterName' });
+    return res.status(400).json({ error: { message: 'Invalid inviterName' } });
   }
   if (!inviterEmail || typeof inviterEmail !== 'string' || !EMAIL_REGEX.test(inviterEmail.trim())) {
-    return res.status(400).json({ error: 'Invalid inviterEmail' });
+    return res.status(400).json({ error: { message: 'Invalid inviterEmail' } });
   }
 
   // Self-invite reject. Defensive check — client passes its own email so this
   // is UX protection, not security. Worst case if a user lies: they create an
   // orphan pending partnership row, recovered by acceptInvite's not-self check.
   if (partnerEmail.trim().toLowerCase() === inviterEmail.trim().toLowerCase()) {
-    return res.status(400).json({ error: 'You cannot invite yourself' });
+    return res.status(400).json({ error: { message: 'You cannot invite yourself' } });
   }
 
   // ── Resend key ───────────────────────────────────────────────
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
-    return res.status(500).json({ error: 'RESEND_API_KEY not configured in environment' });
+    return res.status(500).json({ error: { message: 'RESEND_API_KEY not configured in environment' } });
   }
 
   const cleanName = inviterName.trim();
@@ -112,13 +112,13 @@ If you didn't expect this invite, you can ignore this email.`;
 
     if (!emailRes.ok) {
       console.error('[/api/invite] Resend error:', emailData);
-      return res.status(500).json({ error: 'Email send failed', details: emailData });
+      return res.status(500).json({ error: { message: 'Email send failed' }, details: emailData });
     }
 
     return res.status(200).json({ success: true });
   } catch (e) {
     console.error('[/api/invite] error:', e);
-    return res.status(500).json({ error: e.message || 'Internal error' });
+    return res.status(500).json({ error: { message: e.message || 'Internal error' } });
   }
 }
 

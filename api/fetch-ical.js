@@ -142,26 +142,26 @@ function eventEpochs(ev) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'method_not_allowed' });
+    return res.status(405).json({ error: { message: 'method_not_allowed' } });
   }
 
   if (!process.env.SUPABASE_SERVICE_KEY) {
     console.error('[fetch-ical] SUPABASE_SERVICE_KEY not configured');
-    return res.status(500).json({ error: 'service_key_not_configured' });
+    return res.status(500).json({ error: { message: 'service_key_not_configured' } });
   }
 
   const authHeader = req.headers.authorization || '';
   const jwt = authHeader.replace(/^Bearer\s+/i, '');
   if (!jwt) {
-    return res.status(401).json({ error: 'missing_auth' });
+    return res.status(401).json({ error: { message: 'missing_auth' } });
   }
 
   const { userId, timeMin, timeMax } = req.body || {};
   if (!userId) {
-    return res.status(400).json({ error: 'missing_user_id' });
+    return res.status(400).json({ error: { message: 'missing_user_id' } });
   }
   if (!timeMin || !timeMax) {
-    return res.status(400).json({ error: 'missing_time_window' });
+    return res.status(400).json({ error: { message: 'missing_time_window' } });
   }
 
   try {
@@ -173,12 +173,12 @@ export default async function handler(req, res) {
       }
     });
     if (!userRes.ok) {
-      return res.status(401).json({ error: 'invalid_jwt' });
+      return res.status(401).json({ error: { message: 'invalid_jwt' } });
     }
     const userData = await userRes.json();
     const requesterId = userData?.id;
     if (!requesterId) {
-      return res.status(401).json({ error: 'invalid_jwt' });
+      return res.status(401).json({ error: { message: 'invalid_jwt' } });
     }
 
     // Step 2: Authorization — self or active partner
@@ -189,7 +189,7 @@ export default async function handler(req, res) {
         userJwt: jwt
       });
       if (!rpcRes.ok || rpcRes.data !== true) {
-        return res.status(401).json({ error: 'not_partner' });
+        return res.status(401).json({ error: { message: 'not_partner' } });
       }
     }
 
@@ -200,11 +200,11 @@ export default async function handler(req, res) {
     );
     if (!profileRes.ok) {
       console.error('[fetch-ical] profile read failed', profileRes.status);
-      return res.status(500).json({ error: 'profile_read_failed' });
+      return res.status(500).json({ error: { message: 'profile_read_failed' } });
     }
     const rawUrl = profileRes.data?.[0]?.ical_feed_url;
     if (!rawUrl) {
-      return res.status(404).json({ error: 'no_ical_feed' });
+      return res.status(404).json({ error: { message: 'no_ical_feed' } });
     }
 
     // Step 4: Normalize webcal:// → https:// and fetch the feed.
@@ -215,7 +215,7 @@ export default async function handler(req, res) {
     });
     if (!feedRes.ok) {
       console.error('[fetch-ical] feed fetch failed', feedRes.status, feedUrl);
-      return res.status(502).json({ error: 'feed_fetch_failed' });
+      return res.status(502).json({ error: { message: 'feed_fetch_failed' } });
     }
     const feedText = await feedRes.text();
 
@@ -233,6 +233,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ events: filtered });
   } catch (err) {
     console.error('[fetch-ical] unexpected error', err);
-    return res.status(500).json({ error: 'unexpected_error' });
+    return res.status(500).json({ error: { message: 'unexpected_error' } });
   }
 }

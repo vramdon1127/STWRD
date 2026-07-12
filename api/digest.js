@@ -95,13 +95,13 @@ function esc(s) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: { message: 'Method not allowed' } });
   }
 
   const authHeader = req.headers['authorization'];
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: { message: 'Unauthorized' } });
   }
 
   try {
@@ -113,7 +113,7 @@ export default async function handler(req, res) {
 
     const resendKey = process.env.RESEND_API_KEY;
     if (!resendKey) {
-      return res.status(500).json({ error: 'RESEND_API_KEY not configured in environment' });
+      return res.status(500).json({ error: { message: 'RESEND_API_KEY not configured in environment' } });
     }
 
     let personalBriefing = null;
@@ -164,7 +164,7 @@ export default async function handler(req, res) {
 
   } catch (e) {
     console.error('Digest error:', e);
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: { message: e.message } });
   }
 }
 

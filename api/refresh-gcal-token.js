@@ -47,27 +47,27 @@ async function sbFetch(path, opts = {}) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'method_not_allowed' });
+    return res.status(405).json({ error: { message: 'method_not_allowed' } });
   }
 
   if (!process.env.SUPABASE_SERVICE_KEY) {
     console.error('[refresh-gcal-token] SUPABASE_SERVICE_KEY not configured');
-    return res.status(500).json({ error: 'service_key_not_configured' });
+    return res.status(500).json({ error: { message: 'service_key_not_configured' } });
   }
   if (!process.env.GOOGLE_OAUTH_CLIENT_SECRET) {
     console.error('[refresh-gcal-token] GOOGLE_OAUTH_CLIENT_SECRET not configured');
-    return res.status(500).json({ error: 'google_secret_not_configured' });
+    return res.status(500).json({ error: { message: 'google_secret_not_configured' } });
   }
 
   const authHeader = req.headers.authorization || '';
   const jwt = authHeader.replace(/^Bearer\s+/i, '');
   if (!jwt) {
-    return res.status(401).json({ error: 'missing_auth' });
+    return res.status(401).json({ error: { message: 'missing_auth' } });
   }
 
   const { userId } = req.body || {};
   if (!userId) {
-    return res.status(400).json({ error: 'missing_user_id' });
+    return res.status(400).json({ error: { message: 'missing_user_id' } });
   }
 
   try {
@@ -79,12 +79,12 @@ export default async function handler(req, res) {
       }
     });
     if (!userRes.ok) {
-      return res.status(401).json({ error: 'invalid_jwt' });
+      return res.status(401).json({ error: { message: 'invalid_jwt' } });
     }
     const userData = await userRes.json();
     const requesterId = userData?.id;
     if (!requesterId) {
-      return res.status(401).json({ error: 'invalid_jwt' });
+      return res.status(401).json({ error: { message: 'invalid_jwt' } });
     }
 
     // Step 2: Authorization — self or active partner
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
         userJwt: jwt
       });
       if (!rpcRes.ok || rpcRes.data !== true) {
-        return res.status(401).json({ error: 'not_partner' });
+        return res.status(401).json({ error: { message: 'not_partner' } });
       }
     }
 
@@ -106,11 +106,11 @@ export default async function handler(req, res) {
     );
     if (!profileRes.ok) {
       console.error('[refresh-gcal-token] profile read failed', profileRes.status);
-      return res.status(500).json({ error: 'profile_read_failed' });
+      return res.status(500).json({ error: { message: 'profile_read_failed' } });
     }
     const refreshToken = profileRes.data?.[0]?.gcal_refresh_token;
     if (!refreshToken) {
-      return res.status(404).json({ error: 'no_refresh_token' });
+      return res.status(404).json({ error: { message: 'no_refresh_token' } });
     }
 
     // Step 4: Exchange with Google
@@ -145,9 +145,9 @@ export default async function handler(req, res) {
           console.error('[refresh-gcal-token] failed to clear revoked token',
             patchRes.status);
         }
-        return res.status(401).json({ error: 'invalid_grant' });
+        return res.status(401).json({ error: { message: 'invalid_grant' } });
       }
-      return res.status(500).json({ error: 'google_token_error' });
+      return res.status(500).json({ error: { message: 'google_token_error' } });
     }
 
     const tokenJson = await tokenRes.json();
@@ -157,6 +157,6 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('[refresh-gcal-token] unexpected error', err);
-    return res.status(500).json({ error: 'unexpected_error' });
+    return res.status(500).json({ error: { message: 'unexpected_error' } });
   }
 }

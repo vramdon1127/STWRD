@@ -2164,6 +2164,7 @@ async function reconnectGcal() {
   clearGcalToken();
   clearCalendarCache();
   calendarRangeCache.clear();
+  calendarListCache.clear();
   briefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   tomorrowBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };
   horizonBriefingCache = { fingerprint: null, text: null, ts: 0, windowType: null };

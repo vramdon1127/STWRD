@@ -19,7 +19,7 @@
 #
 # Env overrides:
 #   STWRD_AGENT_MODEL   (default: sonnet)
-#   STWRD_AGENT_TURNS   (default: 25)
+#   STWRD_AGENT_TURNS   (default: 50)
 #   STWRD_BASE_BRANCH   (default: main)
 # ============================================================================
 
@@ -30,7 +30,7 @@ cd "$REPO_ROOT"
 
 BASE_BRANCH="${STWRD_BASE_BRANCH:-main}"
 MODEL="${STWRD_AGENT_MODEL:-sonnet}"
-TURNS="${STWRD_AGENT_TURNS:-25}"
+TURNS="${STWRD_AGENT_TURNS:-50}"
 QUEUE="$REPO_ROOT/agent/queue.md"
 RUN_DIR="$REPO_ROOT/agent/runs"
 STAMP="$(date +%Y-%m-%d-%H%M%S)"

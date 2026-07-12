@@ -186,11 +186,29 @@ function runUnitTests() {
   const out = (r.stdout || '') + (r.stderr || '');
   const passM = out.match(/#\s*pass\s+(\d+)/);
   const failM = out.match(/#\s*fail\s+(\d+)/);
-  const pass = passM ? Number(passM[1]) : 0;
-  const fail = failM ? Number(failM[1]) : (r.status === 0 ? 0 : 1);
-  const ok = r.status === 0 && fail === 0;
-  record('unit-tests', ok, `${pass} passed${fail ? `, ${fail} failed` : ''} across ${files.length} file(s)`);
-  if (!ok) console.log(out.split('\n').filter((l) => /not ok|Error|AssertionError|✖|✗/.test(l)).slice(0, 40).map((l) => '  ' + l).join('\n'));
+  const testsM = out.match(/#\s*tests\s+(\d+)/);
+  const pass = passM ? Number(passM[1]) : null;
+  const fail = failM ? Number(failM[1]) : null;
+  const total = testsM ? Number(testsM[1]) : (pass !== null && fail !== null ? pass + fail : null);
+  // node --test's exit code is authoritative: 0 only if every discovered test passed.
+  // Counts are best-effort for the message, so a parse miss can't spuriously fail a
+  // genuinely-passing run. We still fail hard on a real "0 tests discovered" result.
+  let ok, detail;
+  if (r.status !== 0) {
+    ok = false;
+    detail = `${fail ?? '?'} failed (exit ${r.status}) across ${files.length} file(s)`;
+  } else if (total === 0) {
+    ok = false;
+    detail = `NO TESTS EXECUTED across ${files.length} file(s) — failing`;
+  } else if (total === null) {
+    ok = true;
+    detail = `passed (exit 0; counts unparsed) across ${files.length} file(s)`;
+  } else {
+    ok = true;
+    detail = `${pass}/${total} passed across ${files.length} file(s)`;
+  }
+  record('unit-tests', ok, detail);
+  if (!ok) console.log(out.split('\n').filter((l) => /not ok|Error|AssertionError|✖|✗|# (tests|fail)/.test(l)).slice(0, 40).map((l) => '  ' + l).join('\n'));
 }
 
 // --- run ---------------------------------------------------------------------

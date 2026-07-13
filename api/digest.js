@@ -17,6 +17,13 @@ const PERSONAL_BRIEFING_USER_IDS = new Set([
   '2e5683e0-c6ad-483f-b31d-c93f097c0aeb',
 ]);
 
+// Fallback project list when the projects table can't be read. The
+// enforce_task_project DB trigger rewrites any name not in the user's
+// projects table to 'Personal', so a stale list degrades safely.
+const ALLOWED_PROJECTS = ['App Development', 'Caliber', 'Family', 'GNE', 'Home', 'Personal', 'ServeAnts'];
+const ALLOWED_PRIORITIES = ['P1', 'P2', 'P3', 'P4'];
+const ALLOWED_CATEGORIES = ['AI Complete', 'AI Assist', 'Manual'];
+
 function getServiceKey() {
   return process.env.SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
 }
@@ -117,11 +124,11 @@ export default async function handler(req, res) {
     }
 
     let personalBriefing = null;
-    const needsBriefing = profiles.some(p => PERSONAL_BRIEFING_USER_IDS.has(p.id));
-    if (needsBriefing) {
+    const briefingProfile = profiles.find(p => PERSONAL_BRIEFING_USER_IDS.has(p.id));
+    if (briefingProfile) {
       personalBriefing = await fetchPersonalBriefing();
       if (personalBriefing) {
-        personalBriefing.triage = await triageInbox(personalBriefing);
+        personalBriefing.triage = await triageInbox(personalBriefing, briefingProfile.id);
       }
     }
 
@@ -398,7 +405,7 @@ function buildHouseholdContextForAI(briefing) {
   return lines.join('\n');
 }
 
-async function triageInbox(briefing) {
+async function triageInbox(briefing, userId) {
   const rawTexts = briefing?.imessages?.threads || briefing?.imessages?.urgent || [];
   const rawAccounts = briefing?.gmail?.accounts
     || (briefing?.gmail?.urgent ? [{ threads: briefing.gmail.urgent }] : []);
@@ -406,6 +413,39 @@ async function triageInbox(briefing) {
   if (!rawTexts.length && !rawAccounts.length) {
     return { texts: [], emails: [] };
   }
+
+  // Enrichment context — same sources processTask() reads client-side, so
+  // surfaced items can carry full task metadata into the Brief actionables.
+  // Best-effort: triage still works with empty context if these fail.
+  let projectNames = [...ALLOWED_PROJECTS];
+  let knowledgeByProject = {};
+  let lifeCategories = [];
+  if (userId) {
+    try {
+      const [projectRows, knowledgeRows, lifeRows] = await Promise.all([
+        sbFetch(`projects?user_id=eq.${userId}&select=name&order=sort_order.asc`, true),
+        sbFetch(`knowledge?user_id=eq.${userId}&select=project,context`, true),
+        sbFetch(`life_categories?user_id=eq.${userId}&active=eq.true&select=name,keywords&order=sort_order.asc`, true),
+      ]);
+      if (Array.isArray(projectRows) && projectRows.length) {
+        projectNames = projectRows.map(p => p.name).filter(Boolean);
+      }
+      (Array.isArray(knowledgeRows) ? knowledgeRows : []).forEach(row => {
+        if (row?.project) knowledgeByProject[row.project] = row.context || '';
+      });
+      lifeCategories = Array.isArray(lifeRows) ? lifeRows.filter(c => c?.name) : [];
+    } catch (err) {
+      console.error('triageInbox: enrichment context fetch failed:', err.message);
+    }
+  }
+
+  const projectContext = projectNames.map(name =>
+    `${name.toUpperCase()}: ${knowledgeByProject[name] || name + ' tasks'}`
+  ).join('\n\n');
+  const lifeAreaNames = lifeCategories.length > 0
+    ? lifeCategories.map(c => c.name)
+    : ['Work', 'Family', 'Health', 'Faith', 'Finance', 'Growth', 'Recharge'];
+  const todayChicago = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 
   // Each input carries a stable `id` (deterministic from raw fields). Claude
   // is told to echo the matching id in each surfaced item; we use that to
@@ -496,10 +536,22 @@ For "why": one sentence. Not a summary of the message — the REASON it earned a
 
 Each input item has an \`id\` field. You MUST copy that id verbatim into the matching surfaced item so downstream code can link your judgment back to the source.
 
+Each surfaced item may be promoted to a STWRD task, so every surfaced item must ALSO include these task fields:
+- "task_title": short imperative title (e.g. "Send Ava a quote for her Oct wedding")
+- "description": one line naming who and what (e.g. "Ava (bride) asking for pricing on an October reception")
+- "project": EXACTLY one of [${projectNames.join(' OR ')}]. Never invent a project name. If unsure, "Personal".
+- "priority": one of [P1 OR P2 OR P3 OR P4]. P1=urgent/today, P2=important/this week, P3=normal, P4=low/someday.
+- "task_category": one of [AI Complete OR AI Assist OR Manual], else null. AI Complete = the reply is self-contained; AI could write the finished response from the message alone. AI Assist = AI can draft, but finishing well needs context or judgment only Vijay has. Manual = physical, in-person, or a phone call Vijay must place. When torn, choose AI Assist.
+- "life_area": one of [${lifeAreaNames.join(' OR ')}], else null.
+- "due_date": "YYYY-MM-DD" only if the message implies a date, else null. Never invent a date. Today is ${todayChicago}. "today"/"tonight" = today's date; "tomorrow" = tomorrow's; day names like "Friday" = the next upcoming one; "this week" = this Friday; specific dates like "April 15" = that date in the current year.
+
+PROJECT KNOWLEDGE (use this to pick the right project):
+${projectContext}
+
 Return ONLY valid JSON, no preamble, no markdown fences:
 {
-  "texts": [{ "id": "...", "from": "...", "what": "...", "why": "..." }],
-  "emails": [{ "id": "...", "from": "...", "subject": "...", "why": "..." }]
+  "texts": [{ "id": "...", "from": "...", "what": "...", "why": "...", "task_title": "...", "description": "...", "project": "...", "priority": "...", "task_category": "...", "life_area": "...", "due_date": null }],
+  "emails": [{ "id": "...", "from": "...", "subject": "...", "why": "...", "task_title": "...", "description": "...", "project": "...", "priority": "...", "task_category": "...", "life_area": "...", "due_date": null }]
 }
 
 If nothing in a category warrants surfacing, return an empty array for that category. Empty arrays are fine and expected — quiet morning is real signal.`;
@@ -522,7 +574,7 @@ Triage. Return JSON only.`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
+        max_tokens: 4000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
@@ -542,10 +594,29 @@ Triage. Return JSON only.`;
     // email digest (which only needs from/what/why/subject), but it lacks
     // the fields the Brief view needs and will be dropped by
     // assembleActionables. Email behavior unchanged.
+    // Model output is free text — clamp the task fields to the exact
+    // vocabularies processTask() uses so bad values never reach the brief
+    // payload. Project falls back to Personal (mirroring the DB trigger);
+    // everything else falls back to null.
+    const clampTaskFields = (item) => ({
+      ...item,
+      task_title: typeof item.task_title === 'string' && item.task_title.trim()
+        ? item.task_title.trim() : null,
+      description: typeof item.description === 'string' && item.description.trim()
+        ? item.description.trim() : null,
+      project: projectNames.includes(item.project) ? item.project : 'Personal',
+      priority: ALLOWED_PRIORITIES.includes(item.priority) ? item.priority : null,
+      task_category: ALLOWED_CATEGORIES.includes(item.task_category) ? item.task_category : null,
+      life_area: lifeAreaNames.includes(item.life_area) ? item.life_area : null,
+      due_date: typeof item.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.due_date)
+        ? item.due_date : null,
+    });
+
     const enrichItem = (item, expectedKind) => {
+      const clamped = clampTaskFields(item);
       const meta = item.id ? byId.get(item.id) : null;
-      if (!meta || meta.kind !== expectedKind) return item;
-      return { ...item, ...meta.raw };
+      if (!meta || meta.kind !== expectedKind) return clamped;
+      return { ...clamped, ...meta.raw };
     };
 
     return {
@@ -685,6 +756,19 @@ async function assembleActionables(briefing, userId) {
   const items = [];
   const triage = briefing?.triage || { texts: [], emails: [] };
 
+  // Task enrichment fields returned by triageInbox's Claude call, already
+  // clamped to processTask()'s vocabularies. Named task_category (not
+  // category) because actionable.category is the brief-item kind
+  // (needs_reply / stale_task) that the client and promote.js filter on.
+  const taskFields = (x) => ({
+    description: x.description ?? null,
+    project: x.project ?? null,
+    priority: x.priority ?? null,
+    task_category: x.task_category ?? null,
+    life_area: x.life_area ?? null,
+    due_date: x.due_date ?? null,
+  });
+
   for (const t of triage.texts || []) {
     if (!t.id || !t.sender) continue; // skip items triageInbox couldn't enrich
     const from = t.from || t.sender;
@@ -699,7 +783,8 @@ async function assembleActionables(briefing, userId) {
       source_type: 'imessage',
       source_id: t.id,
       source_dedup_key: t.id,
-      task_title: `Reply to ${from}`,
+      task_title: t.task_title || `Reply to ${from}`,
+      ...taskFields(t),
       promoted: false,
     });
   }
@@ -718,7 +803,8 @@ async function assembleActionables(briefing, userId) {
       source_type: 'gmail',
       source_id: e.id,
       source_dedup_key: e.id,
-      task_title: `Reply: ${subject}`,
+      task_title: e.task_title || `Reply: ${subject}`,
+      ...taskFields(e),
       promoted: false,
     });
   }

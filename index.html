@@ -19,11 +19,14 @@
   window.humanDueLabel = humanDueLabel;
   window.daysBetween = daysBetween;
   // Bridge: expose the tested pure task-section helpers (lib/task-sections.mjs).
-  import { isOverdue, taskDateSection, TASK_SECTION_ORDER, TASK_SECTION_LABELS } from './lib/task-sections.mjs';
+  import { isOverdue, taskDateSection, TASK_SECTION_ORDER, TASK_SECTION_LABELS, priorityRank, sortWithinSection, groupTasksBySections } from './lib/task-sections.mjs';
   window.isOverdue = isOverdue;
   window.taskDateSection = taskDateSection;
   window.TASK_SECTION_ORDER = TASK_SECTION_ORDER;
   window.TASK_SECTION_LABELS = TASK_SECTION_LABELS;
+  window.priorityRank = priorityRank;
+  window.sortWithinSection = sortWithinSection;
+  window.groupTasksBySections = groupTasksBySections;
 </script>
 <style>
   .life-areas-hidden { display: none !important; }
@@ -3432,10 +3435,8 @@ function projectColor(name) {
 // Priority sort: completed sink to bottom, then P1→P4, then null/unknown.
 // Secondary: due_date ASC with NULLS LAST.
 // Tertiary: stable sort preserves input order (created_at DESC from fetch).
-const PRIORITY_RANK = { P1: 1, P2: 2, P3: 3, P4: 4 };
-function priorityRank(task) {
-  return PRIORITY_RANK[task.priority] || 99;
-}
+// priorityRank moved to lib/task-sections.mjs (see the module bridge near the
+// top of <head>); exposed on window from there.
 function sortByPriority(list) {
   return [...list].sort((a, b) => {
     const aDone = a.status === 'done' ? 1 : 0;
@@ -3461,9 +3462,10 @@ function todayStr() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 }
 // Day-of-week / date-math helpers moved to lib/task-dates.mjs, and the
-// task-section helpers moved to lib/task-sections.mjs (see the module bridge
-// near the top of <head>); daysBetween, humanDueLabel, isOverdue,
-// taskDateSection, TASK_SECTION_ORDER, and TASK_SECTION_LABELS are exposed on
+// task-section and task-ordering helpers moved to lib/task-sections.mjs (see
+// the module bridge near the top of <head>); daysBetween, humanDueLabel,
+// isOverdue, taskDateSection, TASK_SECTION_ORDER, TASK_SECTION_LABELS,
+// priorityRank, sortWithinSection, and groupTasksBySections are exposed on
 // window from there.
 // Card-level class for priority + overdue visual treatment (applied alongside .task-card).
 function priCardClass(task) {
@@ -3484,35 +3486,8 @@ function dueBadgeHTML(task) {
   return `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${label}</span>`;
 }
 
-// Sort within a section: priority ASC, due_date ASC NULLS LAST.
-// No overdue-float tier — the section itself expresses that.
-// No done-sink tier — the Completed section itself expresses that.
-function sortWithinSection(list) {
-  return [...list].sort((a, b) => {
-    const pr = priorityRank(a) - priorityRank(b);
-    if (pr !== 0) return pr;
-    const aDue = a.due_date || null;
-    const bDue = b.due_date || null;
-    if (aDue === bDue) return 0;
-    if (!aDue) return 1;
-    if (!bDue) return -1;
-    return aDue < bDue ? -1 : 1;
-  });
-}
-// Returns [{ key, label, count, tasks }, ...] in display order; empty sections omitted.
-function groupTasksBySections(list) {
-  const buckets = { overdue: [], today: [], this_week: [], later: [], no_date: [], done: [] };
-  const today = todayStr();
-  list.forEach(t => buckets[taskDateSection(t, today)].push(t));
-  return TASK_SECTION_ORDER
-    .filter(k => buckets[k].length > 0)
-    .map(k => ({
-      key: k,
-      label: TASK_SECTION_LABELS[k],
-      count: buckets[k].length,
-      tasks: sortWithinSection(buckets[k]),
-    }));
-}
+// sortWithinSection and groupTasksBySections moved to lib/task-sections.mjs
+// (see the module bridge near the top of <head>); exposed on window from there.
 function sectionHeaderHTML(section) {
   return `<div class="task-section-header">${section.label}<span class="count">· ${section.count}</span></div>`;
 }
@@ -3950,7 +3925,7 @@ function renderHatTasks() {
     partnerView: viewingPartner,
   });
 
-  list.innerHTML = groupTasksBySections(filtered)
+  list.innerHTML = groupTasksBySections(filtered, todayStr())
     .map(sec => sectionHeaderHTML(sec) + sec.tasks.map(renderCard).join(''))
     .join('');
   renderSelectionChrome();
@@ -5626,7 +5601,7 @@ function showDrilldown(title, filterFn) {
   }
 
   const renderCard = (task) => renderTaskCard(task, { mode: 'drilldown' });
-  list.innerHTML = groupTasksBySections(filtered)
+  list.innerHTML = groupTasksBySections(filtered, todayStr())
     .map(sec => sectionHeaderHTML(sec) + sec.tasks.map(renderCard).join(''))
     .join('');
 }

@@ -2,17 +2,17 @@
 
 Living list of bugs, tech debt, follow-ups, and feature ideas. Add to it freely. When picking up a session, scan this first.
 
-Last updated: 2026-05-04 (post-auth-refresh fix + Sunday ships + repo cleanup)
+Last updated: 2026-07-13 (pruned: removed items shipped 7/11-7/12; verified each against current code)
+
+VERIFY BEFORE YOU QUEUE: check an item's premise against the current code before acting on it (or handing it to the background agent). A wrong premise produces a plausible, gate-passing, but pointless or harmful change. Several items below were carried as "open" long after they shipped.
 
 ---
 
 ## NOW (pick up next)
 
-- **loadPartner storm.** ~4-8 invocations of loadPartner per partner-view switch. Real cause unclear — switchView re-fires, realtime subscription, or auth event re-trigger. Don't add a naive `if (partnerData) return` guard without first tracing.
+- **loadPartner storm.** ~4-8 invocations of loadPartner per partner-view switch. Real cause unclear — switchView re-fires, realtime subscription, or auth event re-trigger. Needs TRACING first; not a code-edit the background agent should attempt. Don't add a naive `if (partnerData) return` guard without first tracing.
 
-- **renderStats partner/self mixing.** Stats counts may include the wrong user when viewingPartner toggles. Audit which user_id is filtered at each call site.
-
-- **Beta guide PDF refresh.** Doesn't reflect partner calendar feature, life areas hide, or tonight's silent-auth-refresh behavior. Update before next beta-onboarding moment.
+- **Beta guide PDF refresh.** Doesn't reflect partner calendar feature, life areas hide, or the silent-auth-refresh behavior. Product judgment + PDF work. Update before next beta-onboarding moment.
 
 ## iMessage sync — capture sent messages + surface in Brief
 
@@ -30,28 +30,13 @@ Two separate loops, do not bundle:
    - Separate loop. Touches Brief rendering in index.html.
    - Depends on loop 1 landing first (needs the sent-message data).
 
-Captured 5/14/26. Deferred from end-of-day — needs a fresh session,
-working terminal, clear head, one loop at a time.
+Captured 5/14/26. Needs a fresh session, clear head, one loop at a time.
 
 ---
 
-## Bugs (real, observable)
+## Bugs / cleanup (real, observable)
 
-- **fetchCalendarEvents and fetchCalendarEventsRange lack partner-aware 401 retry.** Phase 2b patched this for listUserCalendars (lines 2239-2241) but the same pattern is missing in the other two fetch sites. Risk: partner's expired token could trigger clearGcalToken() and wipe self localStorage. Mirror the listUserCalendars fix.
-
-- **reconnectGcal does not clear calendarListCache.** Only clears calendarRangeCache (via clearCalendarCache at line 2081). On reconnect, stale calendar list could be served for up to GCAL_LIST_TTL_MS.
-
-- **Two stale Vijay profiles in DB.** Active is 2e5683e0-c6ad-483f-b31d-c93f097c0aeb. Stale is 52813d71-b9b3-4ef0-abce-270f60d0902b. Should be removed (or investigated as to how it got created).
-
-## Tech debt
-
-- **No global escape hatch for Supabase client.** Setting `window.__sb = sbClient` in dev mode would dramatically speed up debugging (we wasted ~30 min last session digging localStorage adapters because sbClient wasn't accessible from console).
-
-- **Three error response shapes across api/.** digest.js, refresh-gcal-token.js, fetch-ical.js, and other endpoints use slightly different JSON error formats. Unify.
-
-- **Inline "life area" copy cleanup.** index.html lines 972, 1208, 1579, 3663 still mention "life area" in user-facing copy even though the feature is hidden. CSS-only hide (commit 29d8648) is restoreable, but the copy reads strangely until the feature ships again. Either rephrase or also hide via CSS.
-
-- **`generateBriefing` apiKey fallback.** Doesn't fall back to `currentUserProfile?.anthropic_key` — real correctness gap from C2.
+- **Two stale Vijay profiles in DB.** Active is 2e5683e0-c6ad-483f-b31d-c93f097c0aeb. Stale is 52813d71-b9b3-4ef0-abce-270f60d0902b. Should be removed (or investigated as to how it got created). NOTE: this is a data deletion — do by hand, not via the agent.
 
 ## Investigations needed
 
@@ -65,18 +50,26 @@ working terminal, clear head, one loop at a time.
 
 - **One-tap OAuth integrations (Season 2 vision).** Google Calendar, Gmail, Plaid — couples connect accounts like Mint/YNAB, STWRD merges both partners' data into the digest automatically. Don't build until beta couples signal which integrations matter most.
 
+## Tested-module extraction (background-agent-friendly pattern)
+
+The section/ordering/date/stats logic is now extracted into tested `lib/*.mjs` modules (see below). Remaining inline functions in index.html are mostly render-coupled (they build DOM strings), which do NOT fit the pure-extraction pattern. Only queue a further extraction if the target is genuinely pure; otherwise it needs a human.
+
 ---
 
 ## Recently shipped
 
 Pruning policy: drop entries older than ~2 weeks during weekly review.
 
-- 2026-05-04 Auth refresh path: client-side refreshGcalToken + ensureCalendarToken integration (commit d6d7e57). **Closes C1 Phase 2.** Calendar features no longer prompt for re-auth every ~hour.
-- 2026-05-04 Repo cleanup: gitignore .DS_Store + .claude/ (commit 0773780); 17 stale claude/* branches deleted (no commit, branch ops only).
-- 2026-05-03 Life Areas UI hide: CSS-only hide of 6 surfaces, data + backend preserved, fully reversible (commit 29d8648).
-- 2026-05-03 Settings UI for ical_feed_url + calendar_source_user_id (commit 446cd8c).
-- 2026-05-03 C2 iCal feed support: api/fetch-ical.js + briefing integration (commit f856119).
-- 2026-05-03 C2 calendar-source override + cache fixes: per-userId Maps replacing singletons (commits 194809b, 27bf813).
-- 2026-05-03 Phase 2b: client wrapper getCalendarTokenForUser (commit 43584ff).
-- 2026-05-02 Phase 2: server endpoint api/refresh-gcal-token.js (commit ace5a6a).
-- 2026-05-02 Phase 1: gcal_refresh_token persistence on PKCE sign-in (commit 5a52dd1).
+- 2026-07-12 lib/task-ordering merged into lib/task-sections.mjs (dd1849c): PRIORITY_RANK, priorityRank, sortWithinSection, groupTasksBySections now pure + tested. Background agent; reviewed; 36 tests total pass.
+- 2026-07-12 lib/task-sections.mjs (42d7fcb): isOverdue, taskDateSection, TASK_SECTION_ORDER/LABELS extracted + tested. Background agent.
+- 2026-07-12 lib/task-dates.mjs (d9949af): humanDueLabel, daysBetween extracted + tested. First fully-autonomous clean merge.
+- 2026-07-12 renderStats partner/self mixing RESOLVED: renderStats resolves viewedUserId/viewedUserName from viewingPartner and passes them through computeStats (lib/stats.mjs, 94b5e0e). Was listed as a NOW bug; verified fixed.
+- 2026-07-12 fetchCalendarEvents / fetchCalendarEventsRange 401 handling: closed BY DESIGN. Both throw CalendarAuthExpiredError on 401/403 (Loop E) to surface the reauth banner instead of silently retrying. The old "wipes self localStorage" premise no longer holds. Do NOT re-queue the "mirror listUserCalendars retry" item.
+- 2026-07-12 generateBriefing anthropic_key fallback (680dcdf): now `currentUserProfile?.anthropic_key || localStorage.getItem('apiKey') || null`.
+- 2026-07-12 Inline "life area" user-facing copy cleanup (e33697c).
+- 2026-07-12 Unified api/ JSON error shape to `{ error: { message } }` + client readers (0dd37ff).
+- 2026-07-12 reconnectGcal clears calendarListCache on reconnect (e251f02).
+- 2026-07-11 window.__sb dev-only Supabase handle (50d6e1d).
+- 2026-05-04 Auth refresh path: client-side refreshGcalToken + ensureCalendarToken (d6d7e57). Closes C1 Phase 2.
+- 2026-05-03 Life Areas UI hide: CSS-only hide of 6 surfaces, reversible (29d8648).
+- 2026-05-03 C2 iCal feed support: api/fetch-ical.js + briefing integration (f856119).

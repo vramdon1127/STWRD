@@ -26,11 +26,11 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/vijayramdon/Documents/GitHub/STWRD/scripts/agent-loop.sh</string>
+        <string>/Users/vijayramdon/STWRD/scripts/agent-loop.sh</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/vijayramdon/Documents/GitHub/STWRD</string>
+    <string>/Users/vijayramdon/STWRD</string>
 
     <key>EnvironmentVariables</key>
     <dict>

@@ -1381,6 +1381,18 @@
     <div id="horizonBriefingCard" style="margin-top:26px;"></div>
   </div>
 
+  <!-- TRIAGE VIEW (drill-in from the Brief actionables card) -->
+  <div class="view" id="view-triage">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button onclick="closeTriage()" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;display:flex;align-items:center;gap:6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Brief
+      </button>
+      <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;">📥 Triage</div>
+    </div>
+    <div id="triageBody"></div>
+  </div>
+
   <!-- DRILL DOWN VIEW -->
   <div class="view" id="view-drilldown">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
@@ -4687,6 +4699,7 @@ function toggleActionable(idx) {
   if (briefActionables.selected.has(item.id)) briefActionables.selected.delete(item.id);
   else briefActionables.selected.add(item.id);
   renderBriefActionables();
+  renderTriage();
 }
 
 function renderBriefActionables() {
@@ -4725,7 +4738,10 @@ function renderBriefActionables() {
   el.innerHTML = `
     <div class="stat-card" style="margin-bottom:26px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${rows.length ? '12px' : '0'};gap:10px;">
-        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;">📥 Needs your attention</div>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+          <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;">📥 Needs your attention</span>
+          <button onclick="openTriage()" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;padding:0;">View all →</button>
+        </div>
         ${rows.length ? `<button onclick="promoteSelectedActionables()" ${selCount ? '' : 'disabled'} style="padding:8px 14px;border-radius:10px;border:none;background:${selCount ? 'var(--accent)' : 'var(--surface2)'};color:${selCount ? '#fff' : 'var(--text2)'};font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:${selCount ? 'pointer' : 'not-allowed'};white-space:nowrap;">Add ${selCount || ''} to tasks</button>` : ''}
       </div>
       ${rows.join('')}
@@ -4752,10 +4768,107 @@ async function promoteSelectedActionables() {
     showToast(created ? `✅ Added ${created} to tasks` : (skipped ? 'Already in your tasks' : 'Nothing to add'));
     briefActionables.selected = new Set();
     await loadBriefActionables(); // promoted items drop out of the list
+    renderTriage();               // keep the triage view in sync if it's open
     await loadTasks();            // surface the new tasks
   } catch (e) {
     showToast('⚠️ Promote failed: ' + (e?.message || e));
   }
+}
+
+// ─── TRIAGE VIEW (drill-in from the Brief card) ─────────────────────────────
+// Full-screen surface over the same briefActionables state: select-all,
+// bulk-promote the needs-reply items, and review the stale tasks. Reached via
+// "View all" on the Brief card; not a bottom-nav tab.
+function openTriage() {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const v = document.getElementById('view-triage');
+  if (v) v.classList.add('active');
+  if (!briefActionables.items.length) {
+    loadBriefActionables().then(renderTriage);
+  } else {
+    renderTriage();
+  }
+}
+
+function closeTriage() {
+  showView('brief');
+}
+
+function triageSelectableIds() {
+  return briefActionables.items
+    .filter(i => !i.promoted && i.category === 'needs_reply')
+    .map(i => i.id);
+}
+
+function toggleSelectAllTriage() {
+  const ids = triageSelectableIds();
+  const allSelected = ids.length > 0 && ids.every(id => briefActionables.selected.has(id));
+  if (allSelected) ids.forEach(id => briefActionables.selected.delete(id));
+  else ids.forEach(id => briefActionables.selected.add(id));
+  renderTriage();
+  renderBriefActionables();
+}
+
+function renderTriage() {
+  const el = document.getElementById('triageBody');
+  if (!el) return;
+  const items = briefActionables.items;
+  const selected = briefActionables.selected;
+
+  const replies = [];
+  items.forEach((i, idx) => {
+    if (i.promoted || i.category !== 'needs_reply') return;
+    replies.push({ i, idx });
+  });
+  const stale = items.filter(i => !i.promoted && i.category === 'stale_task');
+
+  if (!replies.length && !stale.length) {
+    el.innerHTML = `<div class="stat-card" style="text-align:center;color:var(--text2);padding:30px;">✅ All clear — nothing needs your attention right now.</div>`;
+    return;
+  }
+
+  const selIds = triageSelectableIds();
+  const allSelected = selIds.length > 0 && selIds.every(id => selected.has(id));
+  const selCount = selIds.filter(id => selected.has(id)).length;
+
+  const replyRows = replies.map(({ i, idx }) => {
+    const icon = i.subtype === 'gmail' ? '📧' : '💬';
+    const checked = selected.has(i.id) ? 'checked' : '';
+    return `
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:var(--surface2);">
+        <input type="checkbox" ${checked} onchange="toggleActionable(${idx})" style="margin-top:3px;flex:0 0 auto;">
+        <span style="flex:1;min-width:0;">
+          <span style="font-weight:600;font-size:14px;">${icon} ${escapeHtml(i.title || '')}</span>
+          ${i.snippet ? `<span style="display:block;color:var(--text2);font-size:12px;margin-top:2px;">${escapeHtml(i.snippet)}</span>` : ''}
+          ${i.reason ? `<span style="display:block;color:var(--text2);opacity:0.8;font-size:11px;margin-top:2px;font-style:italic;">${escapeHtml(i.reason)}</span>` : ''}
+        </span>
+      </label>
+    `;
+  }).join('');
+
+  const staleRows = stale.map(i => `
+    <div style="padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--surface2);opacity:0.85;">
+      <span style="font-weight:600;font-size:14px;">📌 ${escapeHtml(i.title || '')}</span>
+      ${i.snippet ? `<span style="display:block;color:var(--text2);font-size:12px;margin-top:2px;">${escapeHtml(i.snippet)}</span>` : ''}
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    ${replies.length ? `
+    <div class="stat-card" style="margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;">
+        <button onclick="toggleSelectAllTriage()" style="background:none;border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0;">${allSelected ? 'Clear all' : 'Select all'}</button>
+        <button onclick="promoteSelectedActionables()" ${selCount ? '' : 'disabled'} style="padding:8px 14px;border-radius:10px;border:none;background:${selCount ? 'var(--accent)' : 'var(--surface2)'};color:${selCount ? '#fff' : 'var(--text2)'};font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:${selCount ? 'pointer' : 'not-allowed'};white-space:nowrap;">Add ${selCount || ''} to tasks</button>
+      </div>
+      ${replyRows}
+    </div>` : ''}
+    ${stale.length ? `
+    <div class="stat-card">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px;margin-bottom:6px;">📌 Stale tasks (${stale.length})</div>
+      <div style="color:var(--text2);font-size:12px;margin-bottom:12px;">Still open from over a week ago. Complete or reschedule them in your task list.</div>
+      ${staleRows}
+    </div>` : ''}
+  `;
 }
 
 // ─── TOMORROW BRIEFING (Loop G) ───────────────────────────────

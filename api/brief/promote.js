@@ -99,18 +99,21 @@ export default async function handler(req, res) {
       continue;
     }
 
-    // Defaults match what processTask() in index.html sets, minus the
-    // Claude-classified fields. User can edit category/project/priority
+    // Enriched fields come from the digest's triage call (clamped there to
+    // processTask()'s vocabularies). item.task_category is the tasks.category
+    // value — actionable.category is the brief-item kind (needs_reply).
+    // Nulls keep pre-enrichment actionables promotable; the user can edit
     // after promotion. added_by='Brief' marks origin in the UI.
     const taskBody = {
       content: item.task_title || item.title,
       cleaned_task: item.task_title || item.title,
-      category: 'AI Assist',
-      project: 'Personal',
-      priority: 'P2',
-      due_date: null,
+      notes: item.description ?? null,
+      category: item.task_category ?? null,
+      project: item.project ?? null,
+      priority: item.priority ?? null,
+      due_date: item.due_date ?? null,
       recurrence: 'none',
-      life_area: null,
+      life_area: item.life_area ?? null,
       status: 'todo',
       added_by: 'Brief',
       user_id: userId,

@@ -39,6 +39,17 @@ FROM_QUEUE=0
 mkdir -p "$RUN_DIR"
 LOG="$RUN_DIR/$STAMP.md"
 
+# Concurrency guard: only one run at a time. mkdir is atomic, so overlapping
+# scheduled + manual runs can't both proceed and scramble the queue/branches.
+# The lock lives under agent/runs/ (gitignored), so it never dirties the tree.
+# The trap is armed ONLY after we win the lock, so a losing run can't delete it.
+LOCK="$RUN_DIR/.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "another agent-loop run is active ($LOCK); exiting." >&2
+  exit 0
+fi
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
 log() { echo "$@" | tee -a "$LOG" ; }
 
 discard_branch() {

@@ -18,6 +18,12 @@
   import { humanDueLabel, daysBetween } from './lib/task-dates.mjs';
   window.humanDueLabel = humanDueLabel;
   window.daysBetween = daysBetween;
+  // Bridge: expose the tested pure task-section helpers (lib/task-sections.mjs).
+  import { isOverdue, taskDateSection, TASK_SECTION_ORDER, TASK_SECTION_LABELS } from './lib/task-sections.mjs';
+  window.isOverdue = isOverdue;
+  window.taskDateSection = taskDateSection;
+  window.TASK_SECTION_ORDER = TASK_SECTION_ORDER;
+  window.TASK_SECTION_LABELS = TASK_SECTION_LABELS;
 </script>
 <style>
   .life-areas-hidden { display: none !important; }
@@ -3436,8 +3442,9 @@ function sortByPriority(list) {
     const bDone = b.status === 'done' ? 1 : 0;
     if (aDone !== bDone) return aDone - bDone;
     // Overdue floats above all non-overdue regardless of priority.
-    const aOv = isOverdue(a) ? 0 : 1;
-    const bOv = isOverdue(b) ? 0 : 1;
+    const today = todayStr();
+    const aOv = isOverdue(a, today) ? 0 : 1;
+    const bOv = isOverdue(b, today) ? 0 : 1;
     if (aOv !== bOv) return aOv - bOv;
     const pr = priorityRank(a) - priorityRank(b);
     if (pr !== 0) return pr;
@@ -3453,53 +3460,30 @@ function sortByPriority(list) {
 function todayStr() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 }
-function isOverdue(task) {
-  if (!task.due_date || task.status === 'done') return false;
-  return task.due_date < todayStr();
-}
+// Day-of-week / date-math helpers moved to lib/task-dates.mjs, and the
+// task-section helpers moved to lib/task-sections.mjs (see the module bridge
+// near the top of <head>); daysBetween, humanDueLabel, isOverdue,
+// taskDateSection, TASK_SECTION_ORDER, and TASK_SECTION_LABELS are exposed on
+// window from there.
 // Card-level class for priority + overdue visual treatment (applied alongside .task-card).
 function priCardClass(task) {
   if (task.status === 'done') return '';
   const classes = [];
   if (task.priority === 'P1') classes.push('pri-p1');
   else if (task.priority === 'P2') classes.push('pri-p2');
-  if (isOverdue(task)) classes.push('is-overdue');
+  if (isOverdue(task, todayStr())) classes.push('is-overdue');
   return classes.join(' ');
 }
-// Day-of-week / date-math helpers moved to lib/task-dates.mjs (see the module
-// bridge near the top of <head>); daysBetween and humanDueLabel are exposed
-// on window from there.
 // Date chip HTML — red tint + red text when overdue, accent purple otherwise.
 function dueBadgeHTML(task) {
   if (!task.due_date) return '';
   const label = humanDueLabel(task.due_date, todayStr());
-  if (isOverdue(task)) {
+  if (isOverdue(task, todayStr())) {
     return `<span class="tag" style="background:rgba(239,68,68,0.15);color:var(--p1);font-weight:700;">⚠️ ${label}</span>`;
   }
   return `<span class="tag" style="background:rgba(108,99,255,0.1);color:var(--accent);">📅 ${label}</span>`;
 }
 
-// Single source of truth for date-window classification.
-// Order matters: completed wins, then overdue, then today, then near-future, then far-future, then undated.
-function taskDateSection(task) {
-  if (task.status === 'done' || task.completed_at) return 'done';
-  if (isOverdue(task)) return 'overdue';
-  if (!task.due_date) return 'no_date';
-  const today = todayStr();
-  if (task.due_date === today) return 'today';
-  const delta = daysBetween(today, task.due_date);
-  if (delta >= 1 && delta <= 6) return 'this_week';
-  return 'later';
-}
-const TASK_SECTION_ORDER = ['overdue', 'today', 'this_week', 'later', 'no_date', 'done'];
-const TASK_SECTION_LABELS = {
-  overdue: 'Overdue',
-  today: 'Today',
-  this_week: 'This Week',
-  later: 'Later',
-  no_date: 'No due date',
-  done: 'Completed',
-};
 // Sort within a section: priority ASC, due_date ASC NULLS LAST.
 // No overdue-float tier — the section itself expresses that.
 // No done-sink tier — the Completed section itself expresses that.
@@ -3518,7 +3502,8 @@ function sortWithinSection(list) {
 // Returns [{ key, label, count, tasks }, ...] in display order; empty sections omitted.
 function groupTasksBySections(list) {
   const buckets = { overdue: [], today: [], this_week: [], later: [], no_date: [], done: [] };
-  list.forEach(t => buckets[taskDateSection(t)].push(t));
+  const today = todayStr();
+  list.forEach(t => buckets[taskDateSection(t, today)].push(t));
   return TASK_SECTION_ORDER
     .filter(k => buckets[k].length > 0)
     .map(k => ({

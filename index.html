@@ -14,6 +14,10 @@
   // Bridge: expose the tested pure stats module (lib/stats.mjs) to the classic inline script.
   import { computeStats } from './lib/stats.mjs';
   window.computeStats = computeStats;
+  // Bridge: expose the tested pure due-date helpers (lib/task-dates.mjs).
+  import { humanDueLabel, daysBetween } from './lib/task-dates.mjs';
+  window.humanDueLabel = humanDueLabel;
+  window.daysBetween = daysBetween;
 </script>
 <style>
   .life-areas-hidden { display: none !important; }
@@ -3462,41 +3466,13 @@ function priCardClass(task) {
   if (isOverdue(task)) classes.push('is-overdue');
   return classes.join(' ');
 }
-// Day-of-week / date-math helpers (UTC-anchored to avoid browser-local TZ drift;
-// YYYY-MM-DD strings already encode a specific calendar day).
-const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-function dowShort(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return DOW_SHORT[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-}
-function daysBetween(fromStr, toStr) {
-  const [y1, m1, d1] = fromStr.split('-').map(Number);
-  const [y2, m2, d2] = toStr.split('-').map(Number);
-  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
-}
-// Human-readable "when" label — Today/Tomorrow/Yesterday, day-of-week, Next <day>, then MM/DD.
-function humanDueLabel(dueStr) {
-  const today = todayStr();
-  const delta = daysBetween(today, dueStr);
-  const [yy, mm, dd] = dueStr.split('-');
-  const mmdd = `${mm}/${dd}`;
-  if (delta < 0) {
-    const abs = -delta;
-    if (abs === 1) return 'Yesterday';
-    if (abs <= 6) return `${abs} days overdue`;
-    return `${mmdd} overdue`;
-  }
-  if (delta === 0) return 'Today';
-  if (delta === 1) return 'Tomorrow';
-  if (delta <= 6) return dowShort(dueStr);
-  if (delta <= 13) return `Next ${dowShort(dueStr)}`;
-  if (yy === today.slice(0, 4)) return mmdd;
-  return `${mmdd}/${yy.slice(2)}`;
-}
+// Day-of-week / date-math helpers moved to lib/task-dates.mjs (see the module
+// bridge near the top of <head>); daysBetween and humanDueLabel are exposed
+// on window from there.
 // Date chip HTML — red tint + red text when overdue, accent purple otherwise.
 function dueBadgeHTML(task) {
   if (!task.due_date) return '';
-  const label = humanDueLabel(task.due_date);
+  const label = humanDueLabel(task.due_date, todayStr());
   if (isOverdue(task)) {
     return `<span class="tag" style="background:rgba(239,68,68,0.15);color:var(--p1);font-weight:700;">⚠️ ${label}</span>`;
   }

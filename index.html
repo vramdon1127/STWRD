@@ -4604,7 +4604,7 @@ Example outputs to calibrate tone:
 "Light calendar day — just the Lila call at 8 PM. You've got space to finally tackle the NGTF 990 research you've been pushing, and Clayton's wedding picture reply from the 12th is still waiting. Good day to clear the backlog."`;
 
 async function generateBriefing(ctx) {
-  const apiKey = localStorage.getItem('apiKey') || null;
+  const apiKey = currentUserProfile?.anthropic_key || localStorage.getItem('apiKey') || null;
   const response = await fetch('/api/process', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -1375,6 +1375,7 @@
       <span class="banner-icon">🔌</span>
       <span class="banner-text">Google Calendar disconnected. <button class="banner-cta" onclick="reconnectGcal()">Reconnect</button></span>
     </div>
+    <div id="briefActionablesCard"></div>
     <div id="briefingCard"></div>
     <div id="tomorrowBriefingCard" style="margin-top:26px;"></div>
     <div id="horizonBriefingCard" style="margin-top:26px;"></div>
@@ -4631,6 +4632,132 @@ function refreshBriefing() {
   renderBriefing();
 }
 
+// ─── BRIEF ACTIONABLES (needs-your-attention → promote to tasks) ─────────────
+// Reads today's daily_brief via GET /api/brief (RLS self-only), lists the
+// un-promoted flagged texts/emails, and promotes the ones you pick into real
+// tasks via POST /api/brief/promote. Approve-to-promote: nothing auto-creates.
+// Gmail items render the same way once the triage pipeline produces them.
+// Stale-task items are review-only (the promote endpoint rejects them), so
+// they show as a count, not a promote row.
+let briefActionables = { date: null, items: [], selected: new Set() };
+
+function getAuthJwt() {
+  try {
+    const raw = localStorage.getItem('stwrd-auth');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.access_token || parsed?.currentSession?.access_token || null;
+    }
+  } catch (e) {}
+  return null;
+}
+
+async function loadBriefActionables() {
+  const el = document.getElementById('briefActionablesCard');
+  if (!el) return;
+  // Own brief only; hide while viewing a partner's world.
+  if (viewingPartner) { el.innerHTML = ''; return; }
+  const jwt = getAuthJwt();
+  if (!jwt) { el.innerHTML = ''; return; }
+
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  try {
+    const res = await fetch(`/api/brief?date=${today}`, {
+      headers: { 'Authorization': `Bearer ${jwt}` },
+    });
+    if (res.status === 404) {
+      briefActionables = { date: today, items: [], selected: new Set() };
+      el.innerHTML = '';
+      return;
+    }
+    if (!res.ok) { el.innerHTML = ''; return; }
+    const data = await res.json();
+    const items = Array.isArray(data?.payload?.actionables) ? data.payload.actionables : [];
+    briefActionables = { date: data.brief_date || today, items, selected: new Set() };
+    renderBriefActionables();
+  } catch (e) {
+    console.warn('[brief] actionables load failed:', e?.message || e);
+    el.innerHTML = '';
+  }
+}
+
+function toggleActionable(idx) {
+  const item = briefActionables.items[idx];
+  if (!item) return;
+  if (briefActionables.selected.has(item.id)) briefActionables.selected.delete(item.id);
+  else briefActionables.selected.add(item.id);
+  renderBriefActionables();
+}
+
+function renderBriefActionables() {
+  const el = document.getElementById('briefActionablesCard');
+  if (!el) return;
+  const items = briefActionables.items;
+  const selected = briefActionables.selected;
+
+  const rows = [];
+  items.forEach((i, idx) => {
+    if (i.promoted || i.category !== 'needs_reply') return;
+    const icon = i.subtype === 'gmail' ? '📧' : '💬';
+    const checked = selected.has(i.id) ? 'checked' : '';
+    rows.push(`
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:var(--surface2);">
+        <input type="checkbox" ${checked} onchange="toggleActionable(${idx})" style="margin-top:3px;flex:0 0 auto;">
+        <span style="flex:1;min-width:0;">
+          <span style="font-weight:600;font-size:14px;">${icon} ${escapeHtml(i.title || '')}</span>
+          ${i.snippet ? `<span style="display:block;color:var(--text2);font-size:12px;margin-top:2px;">${escapeHtml(i.snippet)}</span>` : ''}
+          ${i.reason ? `<span style="display:block;color:var(--text2);opacity:0.8;font-size:11px;margin-top:2px;font-style:italic;">${escapeHtml(i.reason)}</span>` : ''}
+        </span>
+      </label>
+    `);
+  });
+
+  const staleCount = items.filter(i => !i.promoted && i.category === 'stale_task').length;
+
+  // Nothing flagged and nothing stale → keep the Brief tab clean.
+  if (!rows.length && !staleCount) { el.innerHTML = ''; return; }
+
+  const selCount = items.filter(i => !i.promoted && i.category === 'needs_reply' && selected.has(i.id)).length;
+  const staleBlock = staleCount
+    ? `<div style="color:var(--text2);font-size:12px;margin-top:${rows.length ? '10px' : '0'};">📌 ${staleCount} stale task${staleCount > 1 ? 's' : ''} still open — review them in your task list.</div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="stat-card" style="margin-bottom:26px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${rows.length ? '12px' : '0'};gap:10px;">
+        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;">📥 Needs your attention</div>
+        ${rows.length ? `<button onclick="promoteSelectedActionables()" ${selCount ? '' : 'disabled'} style="padding:8px 14px;border-radius:10px;border:none;background:${selCount ? 'var(--accent)' : 'var(--surface2)'};color:${selCount ? '#fff' : 'var(--text2)'};font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:${selCount ? 'pointer' : 'not-allowed'};white-space:nowrap;">Add ${selCount || ''} to tasks</button>` : ''}
+      </div>
+      ${rows.join('')}
+      ${staleBlock}
+    </div>
+  `;
+}
+
+async function promoteSelectedActionables() {
+  const ids = [...briefActionables.selected];
+  if (!ids.length) return;
+  const jwt = getAuthJwt();
+  if (!jwt) { showToast('⚠️ Not logged in'); return; }
+  try {
+    const res = await fetch('/api/brief/promote', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: briefActionables.date, item_ids: ids }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast('⚠️ Could not add: ' + (out.error || res.status)); return; }
+    const created = out.created || 0;
+    const skipped = out.skipped || 0;
+    showToast(created ? `✅ Added ${created} to tasks` : (skipped ? 'Already in your tasks' : 'Nothing to add'));
+    briefActionables.selected = new Set();
+    await loadBriefActionables(); // promoted items drop out of the list
+    await loadTasks();            // surface the new tasks
+  } catch (e) {
+    showToast('⚠️ Promote failed: ' + (e?.message || e));
+  }
+}
+
 // ─── TOMORROW BRIEFING (Loop G) ───────────────────────────────
 // 24-hour-out prep card. Sits between Today and This Week. Cognitive job
 // is "what do I need to walk into ready" — the briefing read at night.
@@ -5086,7 +5213,7 @@ function showView(name) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`view-${name}`).classList.add('active');
   document.getElementById(`nav-${name}`).classList.add('active');
-  if (name === 'brief') { renderBriefing(); renderTomorrowBriefing(); renderHorizonBriefing(); }
+  if (name === 'brief') { loadBriefActionables(); renderBriefing(); renderTomorrowBriefing(); renderHorizonBriefing(); }
   if (name === 'stats') renderStats();
   if (name === 'settings') { loadHatEditor(); loadDigestSettings(); loadCalendarSettings(); renderKeywordEditor(); renderLifeAreasEditor(); }
   if (name === 'today') {

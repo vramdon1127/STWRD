@@ -4710,7 +4710,7 @@ function renderBriefActionables() {
 
   const rows = [];
   items.forEach((i, idx) => {
-    if (i.promoted || i.category !== 'needs_reply') return;
+    if (i.promoted || i.dismissed || i.category !== 'needs_reply') return;
     const icon = i.subtype === 'gmail' ? '📧' : '💬';
     const checked = selected.has(i.id) ? 'checked' : '';
     rows.push(`
@@ -4721,16 +4721,17 @@ function renderBriefActionables() {
           ${i.snippet ? `<span style="display:block;color:var(--text2);font-size:12px;margin-top:2px;">${escapeHtml(i.snippet)}</span>` : ''}
           ${i.reason ? `<span style="display:block;color:var(--text2);opacity:0.8;font-size:11px;margin-top:2px;font-style:italic;">${escapeHtml(i.reason)}</span>` : ''}
         </span>
+        <button type="button" onclick="dismissActionable(event, ${idx})" title="Dismiss" aria-label="Dismiss" style="background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;padding:0 2px;flex:0 0 auto;line-height:1;">✕</button>
       </label>
     `);
   });
 
-  const staleCount = items.filter(i => !i.promoted && i.category === 'stale_task').length;
+  const staleCount = items.filter(i => !i.promoted && !i.dismissed && i.category === 'stale_task').length;
 
   // Nothing flagged and nothing stale → keep the Brief tab clean.
   if (!rows.length && !staleCount) { el.innerHTML = ''; return; }
 
-  const selCount = items.filter(i => !i.promoted && i.category === 'needs_reply' && selected.has(i.id)).length;
+  const selCount = items.filter(i => !i.promoted && !i.dismissed && i.category === 'needs_reply' && selected.has(i.id)).length;
   const staleBlock = staleCount
     ? `<div style="color:var(--text2);font-size:12px;margin-top:${rows.length ? '10px' : '0'};">📌 ${staleCount} stale task${staleCount > 1 ? 's' : ''} still open — review them in your task list.</div>`
     : '';
@@ -4775,6 +4776,40 @@ async function promoteSelectedActionables() {
   }
 }
 
+async function dismissActionable(evt, idx) {
+  if (evt) { evt.preventDefault(); evt.stopPropagation(); } // don't toggle the row checkbox
+  const btn = evt?.currentTarget || null;
+  const item = briefActionables.items[idx];
+  if (!item || item.dismissed || item.category === 'stale_task') return;
+  const jwt = getAuthJwt();
+  if (!jwt) { showToast('⚠️ Not logged in'); return; }
+  if (btn) btn.disabled = true; // block a double-click racing the PATCH
+  try {
+    const res = await fetch('/api/brief/dismiss', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: briefActionables.date, item_ids: [item.id] }),
+    });
+    const out = await res.json().catch(() => ({}));
+    // dismiss.js soft-fails a lost PATCH to 200 (mirroring promote), and unlike
+    // promote nothing was persisted in that case — treat it as failure here.
+    const patchFailed = Array.isArray(out.errors) && out.errors.some(e => e.error === 'payload_update_failed');
+    if (!res.ok || patchFailed) {
+      showToast('⚠️ Could not dismiss: ' + (out.error || (patchFailed ? 'save failed' : res.status)));
+      if (btn) btn.disabled = false;
+      return;
+    }
+    item.dismissed = true;                     // render guards drop it immediately
+    briefActionables.selected.delete(item.id); // don't leave a hidden item selected
+    showToast('Dismissed');
+    renderBriefActionables();
+    renderTriage();
+  } catch (e) {
+    showToast('⚠️ Dismiss failed: ' + (e?.message || e));
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ─── TRIAGE VIEW (drill-in from the Brief card) ─────────────────────────────
 // Full-screen surface over the same briefActionables state: select-all,
 // bulk-promote the needs-reply items, and review the stale tasks. Reached via
@@ -4796,7 +4831,7 @@ function closeTriage() {
 
 function triageSelectableIds() {
   return briefActionables.items
-    .filter(i => !i.promoted && i.category === 'needs_reply')
+    .filter(i => !i.promoted && !i.dismissed && i.category === 'needs_reply')
     .map(i => i.id);
 }
 
@@ -4817,10 +4852,10 @@ function renderTriage() {
 
   const replies = [];
   items.forEach((i, idx) => {
-    if (i.promoted || i.category !== 'needs_reply') return;
+    if (i.promoted || i.dismissed || i.category !== 'needs_reply') return;
     replies.push({ i, idx });
   });
-  const stale = items.filter(i => !i.promoted && i.category === 'stale_task');
+  const stale = items.filter(i => !i.promoted && !i.dismissed && i.category === 'stale_task');
 
   if (!replies.length && !stale.length) {
     el.innerHTML = `<div class="stat-card" style="text-align:center;color:var(--text2);padding:30px;">✅ All clear — nothing needs your attention right now.</div>`;
@@ -4842,6 +4877,7 @@ function renderTriage() {
           ${i.snippet ? `<span style="display:block;color:var(--text2);font-size:12px;margin-top:2px;">${escapeHtml(i.snippet)}</span>` : ''}
           ${i.reason ? `<span style="display:block;color:var(--text2);opacity:0.8;font-size:11px;margin-top:2px;font-style:italic;">${escapeHtml(i.reason)}</span>` : ''}
         </span>
+        <button type="button" onclick="dismissActionable(event, ${idx})" title="Dismiss" aria-label="Dismiss" style="background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;padding:0 2px;flex:0 0 auto;line-height:1;">✕</button>
       </label>
     `;
   }).join('');

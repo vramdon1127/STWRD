@@ -4717,7 +4717,7 @@ function renderBriefActionables() {
       <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:var(--surface2);">
         <input type="checkbox" ${checked} onchange="toggleActionable(${idx})" style="margin-top:3px;flex:0 0 auto;">
         <span style="flex:1;min-width:0;">
-          <span style="font-weight:600;font-size:14px;">${icon} ${escapeHtml(i.title || '')}</span>
+          <span style="font-weight:600;font-size:14px;">${icon} ${escapeHtml(i.task_title || i.title || '')}</span>
           ${i.snippet ? `<span style="display:block;color:var(--text2);font-size:12px;margin-top:2px;">${escapeHtml(i.snippet)}</span>` : ''}
           ${i.reason ? `<span style="display:block;color:var(--text2);opacity:0.8;font-size:11px;margin-top:2px;font-style:italic;">${escapeHtml(i.reason)}</span>` : ''}
         </span>
@@ -4838,7 +4838,7 @@ function renderTriage() {
       <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:var(--surface2);">
         <input type="checkbox" ${checked} onchange="toggleActionable(${idx})" style="margin-top:3px;flex:0 0 auto;">
         <span style="flex:1;min-width:0;">
-          <span style="font-weight:600;font-size:14px;">${icon} ${escapeHtml(i.title || '')}</span>
+          <span style="font-weight:600;font-size:14px;">${icon} ${escapeHtml(i.task_title || i.title || '')}</span>
           ${i.snippet ? `<span style="display:block;color:var(--text2);font-size:12px;margin-top:2px;">${escapeHtml(i.snippet)}</span>` : ''}
           ${i.reason ? `<span style="display:block;color:var(--text2);opacity:0.8;font-size:11px;margin-top:2px;font-style:italic;">${escapeHtml(i.reason)}</span>` : ''}
         </span>

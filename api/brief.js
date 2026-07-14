@@ -8,7 +8,7 @@
 //
 // Response shape:
 //   200 { id, brief_date, payload: { generated_at, actionables, raw_triage } }
-//        — actionables filtered to those where promoted !== true
+//        — actionables filtered to those where neither promoted nor dismissed is true
 //   404 { error: 'no_brief' } when no row exists for the requested date
 //   401 on missing/invalid JWT
 //
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     const allActionables = Array.isArray(brief.payload?.actionables)
       ? brief.payload.actionables
       : [];
-    const filtered = allActionables.filter(i => !i.promoted);
+    const filtered = allActionables.filter(i => !i.promoted && !i.dismissed);
 
     return res.status(200).json({
       id: brief.id,

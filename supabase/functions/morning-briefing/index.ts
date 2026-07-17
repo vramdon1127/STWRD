@@ -6,6 +6,15 @@
 //
 // Output is a JSON digest consumed by an external script that formats
 // it with Claude. This function does NOT call Claude itself.
+//
+// v34 (2026-07-17): gmail direction support.
+//   - `threads` is now INBOUND-ONLY and keeps its existing shape, so
+//     api/digest.js (briefing.gmail.accounts[].threads) is unaffected
+//     once sent mail begins syncing.
+//   - New sibling `conversations` groups by thread_id and mirrors the
+//     imessages shape (last_message_from_me / last_inbound_at /
+//     last_outbound_at) for reply-suppression logic.
+//   - Direction is derived from the SENT label; no schema/view change.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -69,7 +78,7 @@ Deno.serve(async (_req) => {
 
       supabase
         .from("gmail_messages_filtered")
-        .select("account, from_address, from_name, sender_known_name, sender_relationship, subject, snippet, body_text, received_at, labels, thread_id")
+        .select("account, gmail_id, from_address, from_name, sender_known_name, sender_relationship, subject, snippet, body_text, received_at, labels, thread_id")
         .gte("received_at", since)
         .order("received_at", { ascending: true }),
     ]);
@@ -163,24 +172,54 @@ Deno.serve(async (_req) => {
     const gmailByAccount = groupBy(gmailRows, (r) => r.account);
     const gmailNoiseDropped = gmailRowsAll.length - gmailRows.length;
 
+    const isSent = (m: any) => (m.labels || []).includes("SENT");
+
     const gmail = {
       total_count: gmailRows.length,
       noise_dropped: gmailNoiseDropped,
-      accounts: Object.entries(gmailByAccount).map(([account, msgs]) => ({
-        account,
-        context: ACCOUNT_CONTEXT[account] || "unknown",
-        message_count: msgs.length,
-        unread_count: msgs.filter((m) => (m.labels || []).includes("UNREAD")).length,
-        threads: msgs.map((m) => ({
-          received_at: m.received_at,
-          from_address: m.from_address,
-          from_name: m.sender_known_name || m.from_name,
-          known_relationship: m.sender_relationship,
-          subject: m.subject,
-          snippet: m.snippet,
-          unread: (m.labels || []).includes("UNREAD"),
-        })),
-      })),
+      accounts: Object.entries(gmailByAccount).map(([account, msgs]) => {
+        const inbound = msgs.filter((m) => !isSent(m));
+        const byThread = groupBy(msgs, (m) => m.thread_id);
+        return {
+          account,
+          context: ACCOUNT_CONTEXT[account] || "unknown",
+          account_note: ACCOUNT_CONTEXT[account] ? undefined : `unmapped account: ${account}`,
+          message_count: inbound.length,
+          unread_count: inbound.filter((m) => (m.labels || []).includes("UNREAD")).length,
+          sent_count: msgs.length - inbound.length,
+          threads: inbound.map((m) => ({
+            received_at: m.received_at,
+            from_address: m.from_address,
+            from_name: m.sender_known_name || m.from_name,
+            known_relationship: m.sender_relationship,
+            subject: m.subject,
+            snippet: m.snippet,
+            unread: (m.labels || []).includes("UNREAD"),
+          })),
+          conversations: Object.entries(byThread).map(([thread_id, tmsgs]) => {
+            const tIn = tmsgs.filter((m) => !isSent(m));
+            const tOut = tmsgs.filter((m) => isSent(m));
+            const last = tmsgs[tmsgs.length - 1];
+            return {
+              thread_id,
+              subject: tmsgs[0].subject,
+              counterparty: tIn[0]?.from_address ?? null,
+              message_count: tmsgs.length,
+              last_at: last.received_at,
+              last_message_from_me: isSent(last),
+              last_inbound_at: tIn.length ? tIn[tIn.length - 1].received_at : null,
+              last_outbound_at: tOut.length ? tOut[tOut.length - 1].received_at : null,
+              messages: tmsgs.slice(-5).map((m) => ({
+                received_at: m.received_at,
+                from_me: isSent(m),
+                from_address: m.from_address,
+                text: (m.body_text || m.snippet || "").slice(0, 500),
+              })),
+              truncated: tmsgs.length > 5,
+            };
+          }),
+        };
+      }),
     };
 
     const digest = {

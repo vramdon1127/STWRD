@@ -1,8 +1,19 @@
 // gmail-sync Edge Function
-// Pulls last 30 days of inbox messages from each Gmail account in oauth_tokens
-// and upserts them into gmail_messages, labeled by account.
+// Pulls last 30 days of inbox AND sent messages from each Gmail account in
+// oauth_tokens and upserts them into gmail_messages, labeled by account.
+// Direction is not stored as a column; it is derivable downstream from the
+// SENT label in `labels` (see morning-briefing v34).
 //
 // Schedule: every 5 min via pg_cron + trigger_edge_function wrapper.
+//
+// v31 (2026-07-17):
+//   - GMAIL_QUERY now includes in:sent, so outbound mail syncs and Claude can
+//     see both sides of a thread.
+//   - MAX_MESSAGES_PER_ACCOUNT 200 -> 500. NOTE: there is still no pagination,
+//     so this is a HARD CEILING, not a page size. If the oldest message in the
+//     30d window starts drifting forward, we are clipping and need real paging.
+//   - Dedup lookup chunked (see ID_CHUNK) because a single .in() with 500 ids
+//     builds a query string long enough to risk truncation/limits.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
@@ -11,8 +22,9 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID")!;
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET")!;
 
-const GMAIL_QUERY = "in:inbox newer_than:30d";
-const MAX_MESSAGES_PER_ACCOUNT = 200; // Gmail API page size cap; 200 covers 30d for most accounts
+const GMAIL_QUERY = "(in:inbox OR in:sent) newer_than:30d";
+const MAX_MESSAGES_PER_ACCOUNT = 500; // Gmail API maxResults cap; no pagination, so this is a hard ceiling
+const ID_CHUNK = 100;                 // dedup lookup batch size; keeps the .in() query string short
 const BODY_TEXT_MAX_CHARS = 4000;
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -187,13 +199,19 @@ async function syncAccount(token: GmailToken): Promise<{ account: string; fetche
       return { account: token.account, fetched: 0, upserted: 0 };
     }
 
-    // Skip messages already in DB (by account + gmail_id)
-    const { data: existing } = await sb
-      .from("gmail_messages")
-      .select("gmail_id")
-      .eq("account", token.account)
-      .in("gmail_id", messageIds);
-    const existingSet = new Set((existing ?? []).map((r: { gmail_id: string }) => r.gmail_id));
+    // Skip messages already in DB (by account + gmail_id).
+    // Chunked: one .in() with 500 ids builds an over-long query string.
+    const existingSet = new Set<string>();
+    for (let i = 0; i < messageIds.length; i += ID_CHUNK) {
+      const chunk = messageIds.slice(i, i + ID_CHUNK);
+      const { data: existing, error: existErr } = await sb
+        .from("gmail_messages")
+        .select("gmail_id")
+        .eq("account", token.account)
+        .in("gmail_id", chunk);
+      if (existErr) throw new Error(`Existing-id lookup failed: ${existErr.message}`);
+      for (const r of (existing ?? []) as { gmail_id: string }[]) existingSet.add(r.gmail_id);
+    }
     const newIds = messageIds.filter((id) => !existingSet.has(id));
 
     if (newIds.length === 0) {
